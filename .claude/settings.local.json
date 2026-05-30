@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/limon/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/brainstorming/scripts/start-server.sh --project-dir /Users/limon/project/vlsi-project)",
+      "Bash(git -C /Users/limon/project/vlsi-project remote -v)",
+      "Bash(git -C /Users/limon/project/vlsi-project branch -a)"
+    ]
+  }
+}
