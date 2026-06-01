@@ -188,7 +188,7 @@ score(t) = w_p · (priority(t) / 5) + w_i · (impact(t) / maxImpact)
 
 ## 9. 저장소 / 브랜치 / 위키
 
-- **저장소**: `pkdje/vlsi-project` (개인 저장소 그대로 사용)
+- **저장소**: `boostcampwm-snu-2026-1/flowtodo-pkdje` (부캠 조직 저장소)
 - **브랜치**: `main → dev → features/*` (현재 dev 작업 중)
 - **이슈**: 기능별 Task 를 이슈로 등록 (`task-backlog.md` 참고)
 - **Wiki**: 본 기획서 / 워크플로우 / 회고 를 위키 페이지로 게시

@@ -39,8 +39,8 @@
 
 ```bash
 # Week 2 부터 적용
-git clone https://github.com/pkdje/vlsi-project.git
-cd vlsi-project
+git clone https://github.com/boostcampwm-snu-2026-1/flowtodo-pkdje.git
+cd flowtodo-pkdje
 npm install
 cp .env.example .env.local   # MONGODB_URI 입력
 npm run dev                  # http://localhost:3000
