@@ -181,7 +181,125 @@ SIDE QUESTS 카드:
 | REWARD 텍스트가 후속 이름 길면 카드 깨짐 | 2 ~ 3개 이름 직접 노출 후 그 이상은 "{N}개 해금" 으로 축약. |
 | 이모지 picker 가 모바일 키보드 UX 와 충돌 | 1주차에 모바일 반응형은 스코프 외. 데스크탑 기준만. |
 
-## 8. 회고에서 확인할 것
+## 8. Implementation Hints (Spike #2 결과 반영)
+
+[Spike #2 (React Flow + dagre)](https://github.com/boostcampwm-snu-2026-1/flowtodo-pkdje/issues/2) 에서 검증된 구체 설정값. #8 (DAG 렌더), #22 (퀘스트 카드 노드) 구현 시 시작점으로 사용. 전체 findings: `spike/SPIKE.md` ([브랜치](https://github.com/boostcampwm-snu-2026-1/flowtodo-pkdje/tree/spike/react-flow-dagre/spike)).
+
+### 8.1 dagre 자동 레이아웃 설정
+
+```ts
+const dagreConfig = {
+  rankdir: 'TB',           // Top → Bottom (LR 도 옵션)
+  nodesep: 12,             // 가로 간격. 기본 30 너무 spacious
+  ranksep: 28,             // 세로 간격. 기본 60 너무 spacious
+  ranker: 'tight-tree',    // 'network-simplex' 보다 컴팩트
+  marginx: 16,
+  marginy: 16,
+};
+```
+
+이 값에서 50 ~ 80 노드 그래프가 시각적으로 견딤. 더 spacious 가 필요해지면 사용자 설정으로 노출 가능 (3주 스코프 외).
+
+### 8.2 퀘스트 카드 dagre 노드 크기
+
+dagre 에 전달할 노드 박스 사이즈 (실제 렌더 카드 사이즈와 일치):
+
+```ts
+g.setNode(taskId, { width: 150, height: 76 });
+```
+
+폰트: 본문 11px / 메타·REWARD 9px. 패딩 6/10 px. (자세한 카드 디자인은 §5.1.)
+
+### 8.3 React Flow fitView 설정
+
+```ts
+<ReactFlow
+  fitView
+  fitViewOptions={{
+    padding: 0.08,
+    minZoom: 0.6,   // 글자 가독성 한계
+    maxZoom: 1.5,
+  }}
+  minZoom={0.1}      // 사용자 줌 아웃 한계
+  maxZoom={2}
+/>
+```
+
+`fitViewOptions.minZoom: 0.6` 이 중요. 이 값 없이 fitView 사용하면 노드 수가 늘어날수록 글자 안 보일 정도로 축소됨.
+
+### 8.4 MiniMap 가시성
+
+```tsx
+<MiniMap
+  pannable          // 미니맵 드래그로 메인 뷰포트 이동
+  zoomable          // 스크롤로 줌
+  nodeStrokeColor="#37474f"
+  nodeStrokeWidth={1}
+  maskColor="rgba(15,23,42,0.55)"
+  style={{
+    backgroundColor: '#fff',
+    border: '2px solid #455a64',
+    borderRadius: 6,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+  }}
+  nodeColor={(n) =>
+    n.data?.status === 'done' ? '#a5d6a7'
+      : n.id === selectedId ? '#ff6f00'
+      : '#90a4ae'
+  }
+/>
+```
+
+`pannable + zoomable` 로 미니맵이 단순 표시에서 인터랙티브 컨트롤로 격상. 테두리/그림자/흰배경 으로 메인 화면과 명확히 분리.
+
+### 8.5 노드 클릭 → 연결 엣지/노드 강조 (인지 부하 해소)
+
+엣지 교차는 DAG 구조에서 오는 inherent 특성이라 알고리즘으로 완전히 없앨 수 없음. 대신 "지금 보고 싶은 엣지만" 분리해서 보는 UX 로 해소:
+
+```ts
+const [selectedId, setSelectedId] = useState<string | null>(null);
+
+// onNodeClick → setSelectedId(node.id)
+// onPaneClick → setSelectedId(null)
+
+const connectedIds = useMemo(() => {
+  if (!selectedId) return null;
+  const s = new Set([selectedId]);
+  edges.forEach(e => {
+    if (e.source === selectedId) s.add(e.target);
+    if (e.target === selectedId) s.add(e.source);
+  });
+  return s;
+}, [selectedId, edges]);
+
+// 노드: 비연결은 opacity 0.18
+// 연결 엣지: 주황(#ff6f00) + strokeWidth 2.5 + animated
+// 비연결 엣지: 회색 + opacity 0.3
+```
+
+이 인터랙션은 **#22 안에 포함** (퀘스트 카드 노드의 자연스러운 일부로 구현).
+
+### 8.6 성능 측정 (스파이크)
+
+| 노드 수 | layout 시간 (Mac M-series) |
+|---|---|
+| 50 | < 5 ms |
+| 80 | < 10 ms |
+| 120 | < 25 ms |
+
+3주 스코프(수십 ~ 100 노드)에서 충분. 200+ 노드 측정은 Week 3 회고에서.
+
+### 8.7 검증 안 된 항목 (구현 중 확인)
+
+- 실제 CRUD 와 결합한 인터랙션 성능 (정적 렌더만 측정)
+- 사이클 시도 시 거부 피드백 UX
+- 노드 추가/삭제 시 자동 레이아웃 재계산의 시각적 부드러움 (즉시 vs 트랜지션)
+- 모바일 (스코프 외)
+- 다크 모드 (스코프 외)
+
+---
+
+## 9. 회고에서 확인할 것
 
 - 게이미피케이션 톤이 실제 사용에서 **재미** 인가 **노이즈** 인가? (본인 사용 후 평가)
 - 사이드 퀘스트 자동 분류가 직관적이었는가? 별도 토글이 필요한가?
