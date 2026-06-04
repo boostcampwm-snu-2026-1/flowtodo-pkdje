@@ -89,9 +89,10 @@
 - **AC**:
   - [ ] `GET /api/tasks` — 모든 태스크 반환
   - [ ] `POST /api/tasks` — 생성 (title 필수, 기본 status='todo', priority=3)
-  - [ ] `PATCH /api/tasks/:id` — title/description/status/priority/dueDate/prerequisites 부분 수정
+  - [ ] `PATCH /api/tasks/:id` — title/description/status/priority/dueDate/prerequisites/**icon** 부분 수정
   - [ ] `DELETE /api/tasks/:id` — 삭제 (다른 태스크의 `prerequisites` 에서 해당 id 도 정리)
   - [ ] 서버 측 사이클 검증: `prerequisites` 수정 시 DFS 로 거부
+  - [ ] **`icon?: string` 필드 수용 (이모지 1자, 검증 없음, 미지정 허용)** — [04-quest-game-ui §3](04-quest-game-ui.md#3-데이터-모델-변경)
 - **의존**: #5
 - **검증**: 각 엔드포인트 curl 시나리오 (생성 → 수정 → 삭제 → 사이클 시도 → 거부)
 - **라벨**: `backend`, `week-2`
@@ -193,15 +194,49 @@
 - **검증**: 핀 후 새로고침 → 여전히 상단 / snooze 후 큐에서 사라짐
 - **라벨**: `frontend`, `week-3`
 
-### #16 노드 시각 다듬기
-- **개요**: 우선순위 별, 마감일 D-n, 막힌 태스크 흐림 처리.
+### ~~#16 노드 시각 다듬기~~ (취소 — #22 에 흡수)
+- **상태**: 2026-06-02 결정으로 취소. ★/D-n/막힘 흐림은 모두 [#22 퀘스트 카드 노드](#22-퀘스트-카드-노드-신규) 안에서 같이 구현됨.
+- **참고**: [04-quest-game-ui §6](04-quest-game-ui.md#6-스코프-변경)
+
+### #21 lib/quest.ts + 단위 테스트 (신규)
+- **개요**: 퀘스트 게임 UI 의 모든 파생 계산을 순수 함수로 구현.
 - **AC**:
-  - [ ] 노드 카드에 ★ × priority
-  - [ ] dueDate 있으면 `D-n` 또는 `D+n` 표시 (지난 마감은 빨강)
-  - [ ] prerequisites 미완료인 todo 노드 50% opacity
-- **의존**: #8
-- **검증**: 시각적으로 명확히 구분되는지
+  - [ ] `connectedComponents(tasks)` — Union-Find or BFS
+  - [ ] `questLineProgress(componentId, components, tasks)` — done/total
+  - [ ] `rewardText(task, tasks)` — DAG 구조 → reward 문자열 (5가지 케이스)
+  - [ ] `detectUnlocks(prev, next)` — 막힘 → ready 전환된 task id 들
+  - [ ] 단위 테스트: 빈 그래프 / 선형 / 분기 / 다중 컴포넌트 / 사이드 퀘스트 / 라인 끝 노드 케이스
+- **의존**: 없음 (순수 로직)
+- **검증**: `npm test` 통과
+- **라벨**: `algorithm`, `week-3`
+- **메모**: TDD. 약 1일.
+
+### #22 퀘스트 카드 노드 (신규)
+- **개요**: React Flow Custom Node 로 퀘스트 카드 디자인 + 상태별 변형 + 해금 펄스 애니메이션.
+- **AC**:
+  - [ ] 카드 구조: 아이콘 + 우선순위 별 + 제목 + (마감일 D-n) + (score) + REWARD 라인
+  - [ ] 상태 변형: `todo` 흰색 / `locked` 회색+🔒 LOCKED 배지 / `in_progress` 파랑 / `done` 초록+✓ CLEARED 배지
+  - [ ] `detectUnlocks` 결과 노드에 0.9 초 펄스 애니메이션 (1 사이클만)
+  - [ ] REWARD 텍스트는 `rewardText` 자동 생성 결과
+  - [ ] ★/D-n/막힘 흐림 표시는 카드 안에 포함 (구 #16 흡수)
+- **의존**: #8, #21
+- **검증**: 5 ~ 10 개 mock 그래프에서 모든 상태가 시각적으로 구분되는지
 - **라벨**: `frontend`, `polish`, `week-3`
+- **메모**: 약 1.5일.
+
+### #23 좌측 패널 리스킨 + 사이드 퀘스트 + 이모지 picker (신규)
+- **개요**: 추천 패널을 퀘스트 톤으로 리스킨, SIDE QUESTS 섹션 추가, 새 태스크/편집에 이모지 picker.
+- **AC**:
+  - [ ] NEXT QUEST 카드 — 기존 추천 점수/별/핀/snooze 유지, 시각만 퀘스트 카드 톤
+  - [ ] SIDE QUESTS 섹션 — 사이즈 1 컴포넌트들의 카드 리스트 (아이콘+제목, 짧은 가로 카드)
+  - [ ] 진행 현황 박스 — 메인 퀘스트 X/Y · 사이드 X/Y
+  - [ ] 새 태스크 모달에 이모지 picker (8 ~ 12 추천 + 기본 ⚡ + "다른 이모지")
+  - [ ] 편집 드로어에 이모지 picker
+  - [ ] prerequisite 비어있는 채로 저장 → 자동으로 사이드 퀘스트로 분류 (별도 토글 없음, 자연 분류)
+- **의존**: #14, #21
+- **검증**: 메인+사이드+이모지 변경 시나리오 클릭 한 번에 모두 동작
+- **라벨**: `frontend`, `week-3`
+- **메모**: 약 1일.
 
 ### #17 가중치 슬라이더 (priority vs impact)
 - **개요**: 설정 모달에 `w_p` / `w_i` 슬라이더. 변경 시 추천 즉시 재계산.
@@ -251,19 +286,26 @@
 #1 ─┬─ #2 (spike)
     ├─ #3 (wiki)
     └─ #4 ─ #5 ─ #6 ┐
-            │       ├─ #8 ─ #9 ─ #10 ┬─ #11
-            │       │                └─ #12
+            │       ├─ #8 ─┬─ #9 ─ #10 ┬─ #11
+            │       │      │            └─ #12
+            │       │      │
+            │       │      └─ #22 (퀘스트 카드)
             │       │            
             └── #7 ─┘            
                     
             #13 ──────────────── #14 ┬─ #15
                                      ├─ #17
-                                     └─ #18 ─ #19
-                                              │
-                                              └─ #16
+                                     ├─ #18 ─ #19
+                                     └─ #23 (패널 리스킨 + 사이드)
+
+            #21 (lib/quest.ts) ─┬─ #22
+                                └─ #23
 ```
 
-(주: #13 은 다른 issue 와 거의 독립적이므로 어느 시점에든 병렬 진행 가능)
+(주:
+- #13, #21 은 다른 issue 와 거의 독립적이므로 어느 시점에든 병렬 진행 가능.
+- 구 #16 노드 시각 polish 는 취소되어 #22 에 흡수됨.
+- #22, #23 (퀘스트 UI) 는 Week 3 작업.)
 
 ---
 
