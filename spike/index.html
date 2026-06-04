@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>spike: React Flow + dagre — flowtodo</title>
+  <link rel="stylesheet" href="https://unpkg.com/reactflow@11.10.4/dist/style.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+    .toolbar {
+      padding: 10px 16px;
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+    .toolbar select { padding: 4px 6px; font-size: 12px; }
+    .toolbar .stats {
+      margin-left: auto;
+      font-size: 11px;
+      color: #666;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    .flow-area { flex: 1; background: #f5f5f5; }
+    .react-flow__node-quest {
+      background: white;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      min-width: 120px;
+    }
+    .react-flow__node-quest.done {
+      background: #e8f5e9;
+      border-color: #66bb6a;
+    }
+    .react-flow__node-quest.locked {
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="toolbar">
+      <strong>spike: React Flow + dagre</strong>
+      <label>Size:
+        <select id="size">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="80">80</option>
+          <option value="120">120</option>
+        </select>
+      </label>
+      <label>Shape:
+        <select id="shape">
+          <option value="balanced">Balanced (분기)</option>
+          <option value="deep">Deep (긴 체인)</option>
+          <option value="wide">Wide (얕고 넓음)</option>
+          <option value="mixed">Mixed (혼합)</option>
+        </select>
+      </label>
+      <label>Direction:
+        <select id="dir">
+          <option value="TB" selected>Top → Bottom</option>
+          <option value="LR">Left → Right</option>
+        </select>
+      </label>
+      <label>Node:
+        <select id="nsize">
+          <option value="small">Small (basic)</option>
+          <option value="quest" selected>Quest card</option>
+        </select>
+      </label>
+      <label>Compactness:
+        <select id="compact">
+          <option value="tight" selected>Tight (compact)</option>
+          <option value="default">Default</option>
+          <option value="spacious">Spacious</option>
+        </select>
+      </label>
+      <label>Initial zoom:
+        <select id="zoom">
+          <option value="fit" selected>fitView (auto)</option>
+          <option value="1">100% (no fit)</option>
+          <option value="0.8">80%</option>
+          <option value="0.6">60%</option>
+        </select>
+      </label>
+      <span class="stats" id="stats"></span>
+    </div>
+    <div id="flow" class="flow-area"></div>
+  </div>
+
+  <script type="module">
+    import React from 'https://esm.sh/react@18.3.1';
+    import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+    import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'https://esm.sh/reactflow@11.10.4?deps=react@18.3.1,react-dom@18.3.1';
+    import dagre from 'https://esm.sh/dagre@0.8.5';
+
+    const e = React.createElement;
+
+    // ---------- mock DAG generators ----------
+
+    function generateMockDAG(size, shape) {
+      const nodes = [];
+      const edges = [];
+      const titles = ['리서치','기획','디자인','프론트','백엔드','테스트','배포','문서','회의','PR','리뷰','버그픽스','릴리즈','회고','수집','정리','발표자료','마케팅','UI','API','DB','마이그','캐싱','로깅','모니터링'];
+      const statuses = ['todo','todo','todo','done','done','in_progress'];
+
+      const mkNode = (i) => ({
+        id: `n${i}`,
+        data: {
+          label: `${titles[i % titles.length]} ${i}`,
+          status: statuses[Math.floor(Math.random() * statuses.length)],
+          priority: 1 + Math.floor(Math.random() * 5),
+        },
+      });
+
+      if (shape === 'balanced') {
+        for (let i = 0; i < size; i++) {
+          nodes.push(mkNode(i));
+          if (i > 0) {
+            const parent = Math.floor((i - 1) / 2);
+            edges.push({ id: `e${parent}-${i}`, source: `n${parent}`, target: `n${i}` });
+          }
+          if (i > 4 && Math.random() < 0.15) {
+            const cross = Math.floor(Math.random() * (i - 4));
+            const eid = `c${cross}-${i}`;
+            if (!edges.find(e => e.id === eid)) {
+              edges.push({ id: eid, source: `n${cross}`, target: `n${i}` });
+            }
+          }
+        }
+      } else if (shape === 'deep') {
+        for (let i = 0; i < size; i++) {
+          nodes.push(mkNode(i));
+          if (i > 0) edges.push({ id: `e${i-1}-${i}`, source: `n${i-1}`, target: `n${i}` });
+          if (i > 2 && Math.random() < 0.12) {
+            edges.push({ id: `b${i-2}-${i}`, source: `n${i-2}`, target: `n${i}` });
+          }
+        }
+      } else if (shape === 'wide') {
+        const layers = 5;
+        const perLayer = Math.ceil(size / layers);
+        let count = 0;
+        for (let l = 0; l < layers; l++) {
+          for (let j = 0; j < perLayer && count < size; j++, count++) {
+            nodes.push(mkNode(count));
+            if (l > 0) {
+              const prevStart = (l - 1) * perLayer;
+              const prevEnd = l * perLayer;
+              const numConn = 1 + Math.floor(Math.random() * 2);
+              const used = new Set();
+              for (let k = 0; k < numConn; k++) {
+                const t = prevStart + Math.floor(Math.random() * (prevEnd - prevStart));
+                if (t < count && !used.has(t)) {
+                  used.add(t);
+                  edges.push({ id: `e${t}-${count}`, source: `n${t}`, target: `n${count}` });
+                }
+              }
+            }
+          }
+        }
+      } else { // mixed
+        for (let i = 0; i < size; i++) {
+          nodes.push(mkNode(i));
+          if (i > 0) {
+            const numDeps = 1 + Math.floor(Math.random() * 3);
+            const targets = new Set();
+            for (let k = 0; k < numDeps; k++) {
+              const t = Math.floor(Math.random() * i);
+              if (!targets.has(t)) {
+                targets.add(t);
+                edges.push({ id: `e${t}-${i}-${k}`, source: `n${t}`, target: `n${i}` });
+              }
+            }
+          }
+        }
+      }
+
+      return { nodes, edges };
+    }
+
+    // ---------- dagre layout ----------
+
+    function applyDagreLayout(nodes, edges, direction, nodeSizeMode, compactness) {
+      const g = new dagre.graphlib.Graph();
+      // tighter card defaults — readable but not bloated
+      const w = nodeSizeMode === 'quest' ? 150 : 110;
+      const h = nodeSizeMode === 'quest' ? 76 : 32;
+      const presets = {
+        tight:    { nodesep: 12, ranksep: 28, ranker: 'tight-tree' },
+        default:  { nodesep: 24, ranksep: 48, ranker: 'network-simplex' },
+        spacious: { nodesep: 40, ranksep: 80, ranker: 'network-simplex' },
+      };
+      const cfg = presets[compactness] || presets.tight;
+      g.setGraph({
+        rankdir: direction,
+        nodesep: cfg.nodesep,
+        ranksep: cfg.ranksep,
+        ranker: cfg.ranker,
+        marginx: 16,
+        marginy: 16,
+      });
+      g.setDefaultEdgeLabel(() => ({}));
+
+      nodes.forEach(n => g.setNode(n.id, { width: w, height: h }));
+      edges.forEach(ed => g.setEdge(ed.source, ed.target));
+
+      const t0 = performance.now();
+      dagre.layout(g);
+      const t1 = performance.now();
+
+      const positioned = nodes.map(n => {
+        const layout = g.node(n.id);
+        return {
+          ...n,
+          type: nodeSizeMode === 'quest' ? 'quest' : 'default',
+          position: { x: layout.x - w / 2, y: layout.y - h / 2 },
+          targetPosition: direction === 'TB' ? Position.Top : Position.Left,
+          sourcePosition: direction === 'TB' ? Position.Bottom : Position.Right,
+        };
+      });
+
+      return { positioned, layoutMs: t1 - t0 };
+    }
+
+    // ---------- quest card node ----------
+
+    function QuestCard({ data, targetPosition, sourcePosition }) {
+      const stars = '★'.repeat(data.priority) + '☆'.repeat(5 - data.priority);
+      const cls = `react-flow__node-quest ${data.status === 'done' ? 'done' : ''}`;
+      return e('div', { className: cls, style: {
+        width: 150, padding: '6px 10px',
+        background: data.status === 'done' ? '#e8f5e9'
+                  : data.status === 'in_progress' ? '#e3f2fd' : 'white',
+        border: `1.5px solid ${data.status === 'done' ? '#66bb6a'
+                  : data.status === 'in_progress' ? '#42a5f5' : '#ccc'}`,
+        borderRadius: 8,
+        fontSize: 11,
+        lineHeight: 1.2,
+      } }, [
+        e(Handle, { type: 'target', position: targetPosition, key: 'th' }),
+        e('div', { key: 'top', style: { fontSize: 9, color: '#888' } }, `⚡ ${stars}`),
+        e('div', { key: 'title', style: { fontWeight: 600, margin: '2px 0' } }, data.label),
+        e('div', { key: 'reward', style: { fontSize: 9, color: '#e65100', borderTop: '1px dashed #ffd54f', paddingTop: 3, marginTop: 3 } }, '▷ 후속 해금'),
+        e(Handle, { type: 'source', position: sourcePosition, key: 'sh' }),
+      ]);
+    }
+
+    const nodeTypes = { quest: QuestCard };
+
+    // ---------- main app ----------
+
+    function App() {
+      const [size, setSize] = React.useState(50);
+      const [shape, setShape] = React.useState('balanced');
+      const [direction, setDirection] = React.useState('TB');
+      const [nodeSizeMode, setNodeSizeMode] = React.useState('quest');
+
+      const t0gen = performance.now();
+      const generated = React.useMemo(() => generateMockDAG(size, shape), [size, shape]);
+      const t1gen = performance.now();
+
+      const { positioned, layoutMs } = React.useMemo(
+        () => applyDagreLayout(generated.nodes, generated.edges, direction, nodeSizeMode),
+        [generated, direction, nodeSizeMode]
+      );
+
+      React.useEffect(() => {
+        document.getElementById('stats').textContent =
+          `nodes=${generated.nodes.length} · edges=${generated.edges.length} · ` +
+          `gen=${(t1gen - t0gen).toFixed(1)}ms · layout=${layoutMs.toFixed(1)}ms`;
+      }, [generated, layoutMs]);
+
+      return e(ReactFlow, {
+        nodes: positioned,
+        edges: generated.edges,
+        nodeTypes,
+        fitView: true,
+        minZoom: 0.05,
+        maxZoom: 2,
+        defaultEdgeOptions: { type: 'smoothstep', style: { stroke: '#999', strokeWidth: 1.2 } },
+      }, [
+        e(Background, { key: 'bg', gap: 16, color: '#ddd' }),
+        e(Controls, { key: 'ctrl' }),
+        e(MiniMap, { key: 'mm', nodeColor: (n) => n.data.status === 'done' ? '#a5d6a7' : '#cfd8dc' }),
+      ]);
+    }
+
+    // ---------- toolbar wiring ----------
+
+    let appInstance = null;
+
+    function mount() {
+      const root = createRoot(document.getElementById('flow'));
+      let state = { size: 50, shape: 'balanced', direction: 'TB', nodeSizeMode: 'quest', compactness: 'tight', initialZoom: 'fit' };
+      const Wrapper = () => {
+        const [s, setS] = React.useState(state);
+        appInstance = setS;
+        return e(ReactFlowApp, s);
+      };
+      root.render(e(Wrapper));
+    }
+
+    function ReactFlowApp({ size, shape, direction, nodeSizeMode, compactness, initialZoom }) {
+      const [selectedId, setSelectedId] = React.useState(null);
+
+      const generated = React.useMemo(() => generateMockDAG(size, shape), [size, shape]);
+      const { positioned, layoutMs } = React.useMemo(
+        () => applyDagreLayout(generated.nodes, generated.edges, direction, nodeSizeMode, compactness),
+        [generated, direction, nodeSizeMode, compactness]
+      );
+
+      // Compute connected set for selection highlight
+      const connectedNodeIds = React.useMemo(() => {
+        if (!selectedId) return null;
+        const s = new Set([selectedId]);
+        generated.edges.forEach(ed => {
+          if (ed.source === selectedId) s.add(ed.target);
+          if (ed.target === selectedId) s.add(ed.source);
+        });
+        return s;
+      }, [selectedId, generated.edges]);
+
+      // Apply selection styling to nodes
+      const styledNodes = React.useMemo(() => positioned.map(n => {
+        if (!selectedId) return n;
+        const isConn = connectedNodeIds.has(n.id);
+        return { ...n, style: isConn ? { opacity: 1 } : { opacity: 0.18 } };
+      }), [positioned, selectedId, connectedNodeIds]);
+
+      // Apply selection styling to edges
+      const styledEdges = React.useMemo(() => generated.edges.map(ed => {
+        const isConn = selectedId && (ed.source === selectedId || ed.target === selectedId);
+        const isDim = selectedId && !isConn;
+        return {
+          ...ed,
+          type: 'smoothstep',
+          animated: !!isConn,
+          style: isConn
+            ? { stroke: '#ff6f00', strokeWidth: 2.5 }
+            : isDim
+              ? { stroke: '#ddd', strokeWidth: 1, opacity: 0.3 }
+              : { stroke: '#999', strokeWidth: 1.2 },
+        };
+      }), [generated.edges, selectedId]);
+
+      React.useEffect(() => {
+        document.getElementById('stats').textContent =
+          `nodes=${generated.nodes.length} · edges=${generated.edges.length} · layout=${layoutMs.toFixed(1)}ms · preset=${compactness}` +
+          (selectedId ? ` · selected=${selectedId}` : '');
+      });
+
+      const useFit = initialZoom === 'fit';
+      const zoomNum = useFit ? 1 : parseFloat(initialZoom);
+
+      return e(ReactFlow, {
+        nodes: styledNodes,
+        edges: styledEdges,
+        nodeTypes,
+        fitView: useFit,
+        fitViewOptions: { padding: 0.08, minZoom: 0.6, maxZoom: 1.5 },
+        defaultViewport: useFit ? undefined : { x: 0, y: 0, zoom: zoomNum },
+        minZoom: 0.1,
+        maxZoom: 2,
+        onNodeClick: (_, n) => setSelectedId(n.id),
+        onPaneClick: () => setSelectedId(null),
+      }, [
+        e(Background, { key: 'bg', gap: 16, color: '#ddd' }),
+        e(Controls, { key: 'ctrl' }),
+        e(MiniMap, {
+          key: 'mm',
+          pannable: true,
+          zoomable: true,
+          nodeColor: (n) => n.data?.status === 'done' ? '#a5d6a7'
+                          : n.id === selectedId ? '#ff6f00'
+                          : '#90a4ae',
+          nodeStrokeColor: '#37474f',
+          nodeStrokeWidth: 1,
+          maskColor: 'rgba(15,23,42,0.55)',
+          style: {
+            backgroundColor: '#ffffff',
+            border: '2px solid #455a64',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+          },
+        }),
+      ]);
+    }
+
+    document.getElementById('size').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, size: parseInt(ev.target.value, 10) }));
+    });
+    document.getElementById('shape').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, shape: ev.target.value }));
+    });
+    document.getElementById('dir').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, direction: ev.target.value }));
+    });
+    document.getElementById('nsize').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, nodeSizeMode: ev.target.value }));
+    });
+    document.getElementById('compact').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, compactness: ev.target.value }));
+    });
+    document.getElementById('zoom').addEventListener('change', (ev) => {
+      appInstance && appInstance(s => ({ ...s, initialZoom: ev.target.value }));
+    });
+
+    mount();
+  </script>
+</body>
+</html>

@@ -19,7 +19,12 @@
       "Bash(git remote *)",
       "Bash(git -C /Users/limon/project/vlsi-project log --oneline -3)",
       "Bash(git -C /Users/limon/project/vlsi-project branch -vv)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(ls /tmp/flowtodo-pkdje.wiki/ 2>&1)",
+      "Read(//private/tmp/flowtodo-pkdje.wiki/**)",
+      "Bash(cp /Users/limon/project/vlsi-project/docs/planning/01-project-plan.md /tmp/flowtodo-pkdje.wiki/01-project-plan.md)",
+      "Bash(cp /Users/limon/project/vlsi-project/docs/planning/04-quest-game-ui.md /tmp/flowtodo-pkdje.wiki/04-quest-game-ui.md)",
+      "Bash(bash /tmp/update-issues-w2.sh)"
     ]
   }
 }
