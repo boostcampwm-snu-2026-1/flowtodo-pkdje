@@ -51,14 +51,17 @@ npm run dev                  # http://localhost:3000
 ## 개발 관리
 
 ### 브랜치 모델
-- `main` — 안정 배포 브랜치
-- `dev` — 통합 브랜치, 모든 feature 가 머지되는 곳
-- `feature/<n>-<slug>` — 기능별 작업 브랜치, PR 으로 `dev` 에 머지
+- `main` — 외부 가시 / 마일스톤 / 배포 브랜치
+- `dev` — 통합 브랜치 (그 자체도 feature 처럼 main 으로 PR 됨)
+- `feature/<n>-<slug>` — 기능별 작업 브랜치
 
-### Task / PR 흐름
+### Task / PR 흐름 (2단계)
 1. GitHub Issue 에 task 등록 (Acceptance Criteria 포함, 1 ~ 2일 분량)
 2. `feature/<issue번호>-<짧은이름>` 브랜치 생성
-3. 작업 후 PR (`feature → dev`) 생성, 본인 셀프 리뷰 + 머지
+3. **1단계 PR**: 작업 후 `feature → dev` PR. 셀프 리뷰 + 머지.
+4. **2단계 PR**: 의미 있는 단위 (주차 종료 / 기능군 완료) 마다 `dev → main` PR.
+   - main 이 항상 외부 가시 가능한 상태로 유지됨.
+   - 평가자/외부인이 보는 PR 흐름이 main 기준으로 집계됨.
 
 ### 문서
 - 기획서 / 개발 워크플로우 / 회고 — [GitHub Wiki](../../wiki)
