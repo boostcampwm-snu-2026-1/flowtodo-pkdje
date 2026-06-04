@@ -9,7 +9,7 @@
 **Tech Stack:** Next.js 14.2 · React 18.3 · TypeScript 5.5 · Tailwind CSS 3.4 · ESLint 8.57 · Prettier 3.3
 
 **Issue:** [#4 Next.js 프로젝트 부트스트랩](https://github.com/boostcampwm-snu-2026-1/flowtodo-pkdje/issues/4)
-**Branch model:** `feature/4-nextjs-bootstrap → dev → main`
+**Branch model:** `feature/4-nextjs-bootstrap → main` (트렁크 기반, dev 경유 없음)
 
 ---
 
@@ -41,23 +41,21 @@
 
 ## Task 0: Feature Branch
 
-- [ ] **Step 0.1: Verify on dev branch and clean state**
+- [ ] **Step 0.1: Switch to main and pull latest**
 
 Run:
 ```bash
-git branch --show-current
+git checkout main
+git pull origin main
 git status --short
 ```
 
 Expected:
-```
-dev
-(empty — no uncommitted changes)
-```
+- `main` 이 현재 브랜치
+- 베이스라인 머지 commit 까지 받아옴
+- status 빈 줄 (clean)
 
-If not clean, commit or stash first.
-
-- [ ] **Step 0.2: Create feature branch**
+- [ ] **Step 0.2: Create feature branch from main**
 
 Run:
 ```bash
@@ -617,7 +615,7 @@ git push -u origin feature/4-nextjs-bootstrap
 Run:
 ```bash
 gh pr create --repo boostcampwm-snu-2026-1/flowtodo-pkdje \
-  --base dev --head feature/4-nextjs-bootstrap \
+  --base main --head feature/4-nextjs-bootstrap \
   --title "feat: scaffold Next.js 14 + TS + Tailwind + ESLint + Prettier (#4)" \
   --body "$(cat <<'EOF'
 Closes #4.

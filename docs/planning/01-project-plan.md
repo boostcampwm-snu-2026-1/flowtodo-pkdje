@@ -190,10 +190,8 @@ score(t) = w_p · (priority(t) / 5) + w_i · (impact(t) / maxImpact)
 ## 9. 저장소 / 브랜치 / 위키
 
 - **저장소**: `boostcampwm-snu-2026-1/flowtodo-pkdje` (부캠 조직 저장소)
-- **브랜치**: `main` (외부 가시 / 마일스톤) ← `dev` (통합) ← `feature/*` (기능별)
+- **브랜치 (트렁크 기반)**: `main` (트렁크) ← `feature/*` (기능별)
 - **이슈**: 기능별 Task 를 이슈로 등록 (`task-backlog.md` 참고)
 - **Wiki**: 본 기획서 / 워크플로우 / 회고 를 위키 페이지로 게시
-- **PR 흐름 (2단계)**:
-  1. `feature/<n>-<slug> → dev` (PR, 작은 단위 통합, 셀프 리뷰)
-  2. `dev → main` (PR, 마일스톤별 외부 가시)
-  - main 이 항상 평가자/외부인이 보기에 일관된 상태 유지됨.
+- **PR 흐름**: `feature/<n>-<slug> → main` (PR, 셀프 리뷰 + 머지). 솔로/3주 스코프에 dev 경유는 오버킬이라 트렁크 기반 채택.
+- **dev 브랜치**: 초기 베이스라인 sync 시점까지만 사용. 이후엔 PR 흐름에서 제외 (필요 시 로컬 sandbox).

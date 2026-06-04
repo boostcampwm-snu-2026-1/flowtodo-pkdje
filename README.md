@@ -50,18 +50,18 @@ npm run dev                  # http://localhost:3000
 
 ## 개발 관리
 
-### 브랜치 모델
-- `main` — 외부 가시 / 마일스톤 / 배포 브랜치
-- `dev` — 통합 브랜치 (그 자체도 feature 처럼 main 으로 PR 됨)
-- `feature/<n>-<slug>` — 기능별 작업 브랜치
+### 브랜치 모델 (트렁크 기반)
+- `main` — 트렁크. 모든 PR 의 머지 대상이자 외부 가시 결과.
+- `feature/<n>-<slug>` — 기능별 작업 브랜치. main 에서 분기 → PR 로 main 에 머지.
+- `dev` 는 초기 베이스라인 sync 시점까지만 사용됨. 이후 PR 흐름에서는 빠짐 (필요 시 로컬 sandbox).
 
-### Task / PR 흐름 (2단계)
+### Task / PR 흐름
 1. GitHub Issue 에 task 등록 (Acceptance Criteria 포함, 1 ~ 2일 분량)
-2. `feature/<issue번호>-<짧은이름>` 브랜치 생성
-3. **1단계 PR**: 작업 후 `feature → dev` PR. 셀프 리뷰 + 머지.
-4. **2단계 PR**: 의미 있는 단위 (주차 종료 / 기능군 완료) 마다 `dev → main` PR.
-   - main 이 항상 외부 가시 가능한 상태로 유지됨.
-   - 평가자/외부인이 보는 PR 흐름이 main 기준으로 집계됨.
+2. main 에서 `feature/<issue번호>-<짧은이름>` 브랜치 분기
+3. 작업 후 PR (`feature → main`) 생성. 셀프 리뷰 + 머지.
+4. main 이 항상 평가자/외부인이 보기에 일관된 결과 상태 유지됨.
+
+> 솔로/3주 스코프에 dev 경유 2단계 PR 은 오버킬이라 트렁크 기반 채택. 부캠 자료의 "예) main → dev → features" 는 일반 예시로 해석.
 
 ### 문서
 - 기획서 / 개발 워크플로우 / 회고 — [GitHub Wiki](../../wiki)
