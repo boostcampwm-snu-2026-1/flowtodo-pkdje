@@ -21,8 +21,14 @@ export function Sidebar() {
   return (
     <aside className="w-80 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-4">
       <Section label="▶ NEXT QUEST" note="추천 카드는 #14 에서 채워집니다" />
-      <Section label="⚡ SIDE QUESTS" note="사이드 퀘스트는 #23 에서 채워집니다" />
-      <Section label="진행 현황" note="메인/사이드 진행률은 #23 에서 채워집니다" />
+      <Section
+        label="⚡ SIDE QUESTS"
+        note="사이드 퀘스트는 #23 에서 채워집니다"
+      />
+      <Section
+        label="진행 현황"
+        note="메인/사이드 진행률은 #23 에서 채워집니다"
+      />
     </aside>
   );
 }
