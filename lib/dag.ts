@@ -1,4 +1,5 @@
 import dagre from 'dagre';
+import { Position } from 'reactflow';
 import type { Task } from '@/lib/tasks';
 
 export type FlowNode = {
@@ -6,8 +7,8 @@ export type FlowNode = {
   type: 'task';
   position: { x: number; y: number };
   data: { task: Task };
-  sourcePosition?: 'top' | 'right' | 'bottom' | 'left';
-  targetPosition?: 'top' | 'right' | 'bottom' | 'left';
+  sourcePosition?: Position;
+  targetPosition?: Position;
 };
 
 export type FlowEdge = {
@@ -82,8 +83,8 @@ export function applyLayout(nodes: FlowNode[], edges: FlowEdge[]): FlowNode[] {
         y: laid.y - NODE_HEIGHT / 2,
       },
       // TB 레이아웃의 핸들 위치
-      targetPosition: 'top' as const,
-      sourcePosition: 'bottom' as const,
+      targetPosition: Position.Top,
+      sourcePosition: Position.Bottom,
     };
   });
 }
