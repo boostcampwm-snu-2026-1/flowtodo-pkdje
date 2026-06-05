@@ -209,9 +209,7 @@ export async function updateTask(
         .find({ _id: { $in: others } }, { projection: { _id: 1 } })
         .toArray();
       if (existingPrereqs.length !== others.length) {
-        throw new TaskValidationError(
-          'one or more prerequisites do not exist',
-        );
+        throw new TaskValidationError('one or more prerequisites do not exist');
       }
     }
 
