@@ -1,4 +1,5 @@
 import { Canvas } from './components/Canvas';
+import { CreateTaskModal } from './components/CreateTaskModal';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 
@@ -10,6 +11,7 @@ export default function Home() {
         <Sidebar />
         <Canvas />
       </div>
+      <CreateTaskModal />
     </div>
   );
 }
