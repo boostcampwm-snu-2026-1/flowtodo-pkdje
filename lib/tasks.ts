@@ -126,7 +126,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   }
 
   const status =
-    input.status !== undefined ? validateStatus(input.status) : ('todo' as Status);
+    input.status !== undefined
+      ? validateStatus(input.status)
+      : ('todo' as Status);
   const priority =
     input.priority !== undefined
       ? validatePriority(input.priority)
@@ -167,4 +169,47 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   return serializeTask({ ...doc, _id: result.insertedId } as TaskDoc);
 }
 
-// updateTask, deleteTask, hasCycle — Tasks 3, 4 에서 추가
+// updateTask, deleteTask — Task 4 에서 추가
+
+// ---------- pure: cycle detection ----------
+
+/**
+ * 3색 DFS 로 그래프 전체에 사이클이 있는지 검사.
+ * gray 상태 노드를 다시 방문하면 back edge = 사이클.
+ * 그래프 외부의 prereq 참조 (dangling) 는 skip — cascade 삭제 직후 잠시 존재 가능.
+ */
+export function hasCycle(
+  tasks: ReadonlyArray<Pick<TaskDoc, '_id' | 'prerequisites'>>,
+): boolean {
+  type Color = 'white' | 'gray' | 'black';
+  const color = new Map<string, Color>();
+  const prereqMap = new Map<string, string[]>();
+
+  for (const t of tasks) {
+    const id = t._id.toString();
+    color.set(id, 'white');
+    prereqMap.set(
+      id,
+      t.prerequisites.map((p) => p.toString()),
+    );
+  }
+
+  function dfs(id: string): boolean {
+    color.set(id, 'gray');
+    const prereqs = prereqMap.get(id) ?? [];
+    for (const p of prereqs) {
+      if (!color.has(p)) continue; // dangling — skip
+      const c = color.get(p);
+      if (c === 'gray') return true;
+      if (c === 'white' && dfs(p)) return true;
+    }
+    color.set(id, 'black');
+    return false;
+  }
+
+  for (const t of tasks) {
+    const id = t._id.toString();
+    if (color.get(id) === 'white' && dfs(id)) return true;
+  }
+  return false;
+}
