@@ -1,63 +1,45 @@
 'use client';
 
 import 'reactflow/dist/style.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import { TaskNode } from './TaskNode';
 import { applyLayout, buildGraph } from '@/lib/dag';
-import type { Task } from '@/lib/tasks';
+import { useAppStore } from '@/lib/store';
 
 const nodeTypes = { task: TaskNode };
 
-type FetchState =
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string }
-  | { kind: 'ready'; tasks: Task[] };
-
 export function Canvas() {
-  const [state, setState] = useState<FetchState>({ kind: 'loading' });
+  const tasks = useAppStore((s) => s.tasks);
+  const status = useAppStore((s) => s.tasksStatus);
+  const error = useAppStore((s) => s.tasksError);
+  const fetchTasks = useAppStore((s) => s.fetchTasks);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch('/api/tasks')
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: { tasks: Task[] }) => {
-        if (!cancelled) setState({ kind: 'ready', tasks: data.tasks });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled)
-          setState({
-            kind: 'error',
-            message: err instanceof Error ? err.message : String(err),
-          });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    fetchTasks();
+  }, [fetchTasks]);
 
   const layout = useMemo(() => {
-    if (state.kind !== 'ready') return null;
-    const { nodes, edges } = buildGraph(state.tasks);
+    if (status !== 'ready') return null;
+    const { nodes, edges } = buildGraph(tasks);
     return { nodes: applyLayout(nodes, edges), edges };
-  }, [state]);
+  }, [status, tasks]);
 
   return (
     <main className="relative flex-1 overflow-hidden bg-slate-100">
-      {state.kind === 'loading' && <CenterMessage text="로딩 중..." />}
-      {state.kind === 'error' && (
+      {(status === 'idle' || status === 'loading') && (
+        <CenterMessage text="로딩 중..." />
+      )}
+      {status === 'error' && (
         <CenterMessage
-          text={`불러오기 실패: ${state.message}`}
+          text={`불러오기 실패: ${error ?? 'unknown'}`}
           textClass="text-red-500"
         />
       )}
-      {state.kind === 'ready' && state.tasks.length === 0 && (
-        <CenterMessage text="아직 태스크가 없습니다 (#9 에서 생성 모달 추가 예정)" />
+      {status === 'ready' && tasks.length === 0 && (
+        <CenterMessage text="아직 태스크가 없습니다. 우측 상단 + 새 태스크 로 시작하세요." />
       )}
-      {state.kind === 'ready' && layout && state.tasks.length > 0 && (
+      {status === 'ready' && layout && tasks.length > 0 && (
         <ReactFlow
           nodes={layout.nodes}
           edges={layout.edges}
