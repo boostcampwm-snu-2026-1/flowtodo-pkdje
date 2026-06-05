@@ -169,7 +169,91 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   return serializeTask({ ...doc, _id: result.insertedId } as TaskDoc);
 }
 
-// updateTask, deleteTask — Task 4 에서 추가
+export async function updateTask(
+  id: string,
+  input: UpdateTaskInput,
+): Promise<Task> {
+  const _id = toObjectId(id, 'id');
+  const col = await getCollection();
+
+  const existing = await col.findOne({ _id });
+  if (!existing) throw new TaskNotFoundError(id);
+
+  // build $set patch with validated fields
+  const set: Partial<TaskDoc> = { updatedAt: new Date() };
+
+  if (input.title !== undefined) {
+    if (typeof input.title !== 'string' || input.title.trim() === '') {
+      throw new TaskValidationError('title must be a non-empty string');
+    }
+    set.title = input.title.trim();
+  }
+  if (input.description !== undefined) set.description = input.description;
+  if (input.status !== undefined) set.status = validateStatus(input.status);
+  if (input.priority !== undefined)
+    set.priority = validatePriority(input.priority);
+  if (input.dueDate !== undefined) {
+    set.dueDate = input.dueDate ? new Date(input.dueDate) : undefined;
+  }
+  if (input.icon !== undefined) set.icon = input.icon;
+
+  if (input.prerequisites !== undefined) {
+    const newPrereqs = input.prerequisites.map((p) =>
+      toObjectId(p, 'prerequisite'),
+    );
+
+    // verify all referenced prereqs exist (other than self — caught by cycle check)
+    const others = newPrereqs.filter((p) => !p.equals(_id));
+    if (others.length > 0) {
+      const existingPrereqs = await col
+        .find({ _id: { $in: others } }, { projection: { _id: 1 } })
+        .toArray();
+      if (existingPrereqs.length !== others.length) {
+        throw new TaskValidationError(
+          'one or more prerequisites do not exist',
+        );
+      }
+    }
+
+    // cycle check on proposed state
+    const allTasks = await col
+      .find({}, { projection: { _id: 1, prerequisites: 1 } })
+      .toArray();
+    const proposed = allTasks.map((t) =>
+      t._id.equals(_id) ? { _id: t._id, prerequisites: newPrereqs } : t,
+    );
+    if (hasCycle(proposed)) throw new TaskCycleError();
+
+    set.prerequisites = newPrereqs;
+  }
+
+  const result = await col.findOneAndUpdate(
+    { _id },
+    { $set: set },
+    { returnDocument: 'after' },
+  );
+  if (!result) throw new TaskNotFoundError(id);
+  return serializeTask(result);
+}
+
+export async function deleteTask(
+  id: string,
+): Promise<{ deleted: boolean; cascadeFrom: number }> {
+  const _id = toObjectId(id, 'id');
+  const col = await getCollection();
+
+  const existing = await col.findOne({ _id }, { projection: { _id: 1 } });
+  if (!existing) throw new TaskNotFoundError(id);
+
+  // cascade: remove this id from any other task's prerequisites
+  const cascade = await col.updateMany(
+    { prerequisites: _id },
+    { $pull: { prerequisites: _id }, $set: { updatedAt: new Date() } },
+  );
+
+  await col.deleteOne({ _id });
+  return { deleted: true, cascadeFrom: cascade.modifiedCount };
+}
 
 // ---------- pure: cycle detection ----------
 
