@@ -1,0 +1,11 @@
+.next/
+node_modules/
+out/
+package-lock.json
+spike/
+.superpowers/
+docs/
+
+# Markdown is hand-authored (intentional line breaks, table alignment)
+*.md
+**/*.md
