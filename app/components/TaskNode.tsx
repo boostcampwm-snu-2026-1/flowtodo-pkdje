@@ -9,11 +9,19 @@ const statusClasses: Record<Task['status'], string> = {
   done: 'bg-green-50 border-green-500 text-slate-900',
 };
 
-export function TaskNode({ data }: { data: { task: Task } }) {
+export function TaskNode({
+  data,
+  selected,
+}: {
+  data: { task: Task };
+  selected?: boolean;
+}) {
   const { task } = data;
   return (
     <div
-      className={`flex h-[76px] w-[150px] flex-col justify-center rounded-lg border-2 px-3 py-2 text-xs shadow-sm ${statusClasses[task.status]}`}
+      className={`flex h-[76px] w-[150px] flex-col justify-center rounded-lg border-2 px-3 py-2 text-xs shadow-sm ${statusClasses[task.status]} ${
+        selected ? 'ring-2 ring-orange-500 ring-offset-1' : ''
+      }`}
     >
       <Handle type="target" position={Position.Top} className="!bg-slate-400" />
       <div className="line-clamp-2 font-medium leading-tight">{task.title}</div>

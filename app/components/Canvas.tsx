@@ -48,6 +48,12 @@ export function Canvas() {
           fitViewOptions={{ padding: 0.08, minZoom: 0.6, maxZoom: 1.5 }}
           minZoom={0.1}
           maxZoom={2}
+          onNodeClick={(_, node) => {
+            const current = useAppStore.getState().selectedTaskId;
+            useAppStore
+              .getState()
+              .selectTask(current === node.id ? null : node.id);
+          }}
           defaultEdgeOptions={{
             style: { stroke: '#94a3b8', strokeWidth: 1.5 },
           }}
