@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CreateTaskInput, Task } from '@/lib/tasks';
+import type { CreateTaskInput, Task, UpdateTaskInput } from '@/lib/tasks';
 
 type TasksStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -8,11 +8,15 @@ type AppState = {
   tasksStatus: TasksStatus;
   tasksError: string | null;
   createModalOpen: boolean;
+  selectedTaskId: string | null;
 
   fetchTasks: () => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task>;
+  updateTask: (id: string, patch: UpdateTaskInput) => Promise<Task>;
+  deleteTask: (id: string) => Promise<void>;
   openCreateModal: () => void;
   closeCreateModal: () => void;
+  selectTask: (id: string | null) => void;
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -20,6 +24,7 @@ export const useAppStore = create<AppState>((set) => ({
   tasksStatus: 'idle',
   tasksError: null,
   createModalOpen: false,
+  selectedTaskId: null,
 
   fetchTasks: async () => {
     set({ tasksStatus: 'loading', tasksError: null });
@@ -57,6 +62,47 @@ export const useAppStore = create<AppState>((set) => ({
     return task;
   },
 
+  updateTask: async (id, patch) => {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+    const { task }: { task: Task } = await res.json();
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === id ? task : t)),
+    }));
+    return task;
+  },
+
+  deleteTask: async (id) => {
+    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+    // cascade detach 결과를 클라이언트에 반영하기 위해 다시 받아온다
+    await useAppStore.getState().fetchTasks();
+    set({ selectedTaskId: null });
+  },
+
   openCreateModal: () => set({ createModalOpen: true }),
   closeCreateModal: () => set({ createModalOpen: false }),
+  selectTask: (id) => set({ selectedTaskId: id }),
 }));
