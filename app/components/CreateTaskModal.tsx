@@ -14,6 +14,7 @@ export function CreateTaskModal() {
 
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>(3);
+  const [dueDate, setDueDate] = useState(''); // YYYY-MM-DD, '' = 없음
   const [prereqs, setPrereqs] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export function CreateTaskModal() {
     if (open) {
       setTitle('');
       setPriority(3);
+      setDueDate('');
       setPrereqs([]);
       setSubmitting(false);
       setError(null);
@@ -50,6 +52,7 @@ export function CreateTaskModal() {
         title: trimmedTitle,
         priority,
         prerequisites: prereqs,
+        ...(dueDate ? { dueDate } : {}),
       });
       close();
     } catch (err) {
@@ -117,6 +120,33 @@ export function CreateTaskModal() {
                   {p}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="task-due"
+              className="mb-1 block text-xs font-medium text-slate-600"
+            >
+              마감일
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="task-due"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+              {dueDate && (
+                <button
+                  type="button"
+                  onClick={() => setDueDate('')}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  ✕ 지우기
+                </button>
+              )}
             </div>
           </div>
 
