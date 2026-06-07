@@ -1,11 +1,12 @@
 'use client';
 
 import 'reactflow/dist/style.css';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import { TaskNode } from './TaskNode';
 import { applyLayout, buildGraph } from '@/lib/dag';
 import { useAppStore } from '@/lib/store';
+import type { Status, Task } from '@/lib/tasks';
 
 const nodeTypes = { task: TaskNode };
 
@@ -15,9 +16,52 @@ export function Canvas() {
   const error = useAppStore((s) => s.tasksError);
   const fetchTasks = useAppStore((s) => s.fetchTasks);
 
+  const clickTimer = useRef<number | null>(null);
+  const togglingRef = useRef<Set<string>>(new Set());
+
+  const handleNodeClick = (_: unknown, node: { id: string }) => {
+    if (clickTimer.current !== null) return;
+    clickTimer.current = window.setTimeout(() => {
+      clickTimer.current = null;
+      const current = useAppStore.getState().selectedTaskId;
+      useAppStore.getState().selectTask(current === node.id ? null : node.id);
+    }, 180);
+  };
+
+  const handleNodeDoubleClick = async (
+    _: unknown,
+    node: { id: string; data?: { task?: Task } },
+  ) => {
+    if (clickTimer.current !== null) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    if (togglingRef.current.has(node.id)) return;
+    const task = node.data?.task;
+    if (!task) return;
+    const next = nextStatus(task.status);
+    togglingRef.current.add(node.id);
+    try {
+      await useAppStore.getState().updateTask(node.id, { status: next });
+    } catch (err) {
+      console.error('[status toggle]', err);
+    } finally {
+      togglingRef.current.delete(node.id);
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current !== null) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+      }
+    };
+  }, []);
 
   const layout = useMemo(() => {
     if (status !== 'ready') return null;
@@ -48,12 +92,8 @@ export function Canvas() {
           fitViewOptions={{ padding: 0.08, minZoom: 0.6, maxZoom: 1.5 }}
           minZoom={0.1}
           maxZoom={2}
-          onNodeClick={(_, node) => {
-            const current = useAppStore.getState().selectedTaskId;
-            useAppStore
-              .getState()
-              .selectTask(current === node.id ? null : node.id);
-          }}
+          onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           defaultEdgeOptions={{
             style: { stroke: '#94a3b8', strokeWidth: 1.5 },
           }}
@@ -102,4 +142,8 @@ function CenterMessage({
       </div>
     </div>
   );
+}
+
+function nextStatus(s: Status): Status {
+  return s === 'todo' ? 'in_progress' : s === 'in_progress' ? 'done' : 'todo';
 }
