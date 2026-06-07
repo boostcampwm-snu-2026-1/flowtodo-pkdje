@@ -6,6 +6,7 @@ vi.mock('@/lib/mongo', () => ({ default: Promise.resolve(null) }));
 
 import {
   computeImpact,
+  computeImpactSet,
   computeReadySet,
   computeRecommendations,
   computeScore,
@@ -142,29 +143,57 @@ describe('computeImpact', () => {
 });
 
 describe('computeScore', () => {
-  it('priority=5, impact=4, maxImpact=4 → score=1.0', () => {
-    const task = mkTask('a', [], { priority: 5 });
+  it('priority=1 (highest), impact=4, maxImpact=4 → score=1.0', () => {
+    const task = mkTask('a', [], { priority: 1 });
     const { score, breakdown } = computeScore(task, 4, 4);
     expect(score).toBeCloseTo(1.0, 5);
     expect(breakdown.priorityComponent).toBeCloseTo(0.6, 5);
     expect(breakdown.impactComponent).toBeCloseTo(0.4, 5);
   });
 
-  it('priority=3, impact=0, maxImpact=4 → score=0.36', () => {
+  it('priority=5 (lowest), impact=4, maxImpact=4 → score=0.52', () => {
+    const task = mkTask('a', [], { priority: 5 });
+    const { score, breakdown } = computeScore(task, 4, 4);
+    // w_p · (6-5)/5 + w_i · 1 = 0.6·0.2 + 0.4 = 0.12 + 0.4 = 0.52
+    expect(score).toBeCloseTo(0.52, 5);
+    expect(breakdown.priorityComponent).toBeCloseTo(0.12, 5);
+    expect(breakdown.impactComponent).toBeCloseTo(0.4, 5);
+  });
+
+  it('priority=3 (middle), impact=0, maxImpact=4 → score=0.36', () => {
     const task = mkTask('a', [], { priority: 3 });
     const { score, breakdown } = computeScore(task, 0, 4);
+    // w_p · (6-3)/5 = 0.6 · 0.6 = 0.36 (priority=3 은 중간이라 반전 전후 동일)
     expect(score).toBeCloseTo(0.36, 5);
     expect(breakdown.priorityComponent).toBeCloseTo(0.36, 5);
     expect(breakdown.impactComponent).toBeCloseTo(0, 5);
   });
 
   it('maxImpact=0 → impactComponent=0, score=priorityComponent', () => {
-    const task = mkTask('a', [], { priority: 4 });
+    const task = mkTask('a', [], { priority: 2 });
     const { score, breakdown } = computeScore(task, 0, 0);
-    // w_p · 4/5 = 0.6 · 0.8 = 0.48
+    // w_p · (6-2)/5 = 0.6 · 0.8 = 0.48
     expect(score).toBeCloseTo(0.48, 5);
     expect(breakdown.priorityComponent).toBeCloseTo(0.48, 5);
     expect(breakdown.impactComponent).toBe(0);
+  });
+});
+
+describe('computeImpactSet', () => {
+  it('returns same size as computeImpact', () => {
+    const tasks = [mkTask('a'), mkTask('b', ['a']), mkTask('c', ['b'])];
+    const sets = computeImpactSet(tasks);
+    const nums = computeImpact(tasks);
+    for (const [id, set] of sets) {
+      expect(set.size).toBe(nums.get(id));
+    }
+  });
+
+  it('exposes downstream ids (linear A→B→C → A.unlocks={B,C})', () => {
+    const tasks = [mkTask('a'), mkTask('b', ['a']), mkTask('c', ['b'])];
+    const sets = computeImpactSet(tasks);
+    expect(Array.from(sets.get('a')!).sort()).toEqual(['b', 'c']);
+    expect(Array.from(sets.get('b')!)).toEqual(['c']);
   });
 });
 
@@ -193,10 +222,10 @@ describe('computeRecommendations', () => {
     // 다이아몬드: A→B, A→C, B→D, C→D. A 가 done. 나머지 todo.
     // ready = B, C (A done 이므로). D 는 B,C 가 todo 라서 아직 ready 아님.
     // impact: A=3 (B,C,D), B=1 (D), C=1 (D), D=0
-    // maxImpact=3. ready 의 score:
-    //   B (priority=3): 0.6·0.6 + 0.4·(1/3) = 0.36 + 0.1333 = 0.4933
-    //   C (priority=4): 0.6·0.8 + 0.4·(1/3) = 0.48 + 0.1333 = 0.6133
-    // → C 가 1등, B 가 2등.
+    // maxImpact=3. ready 의 score (priority 1 = 가장 높음):
+    //   B (priority=3): 0.6·(6-3)/5 + 0.4·(1/3) = 0.36 + 0.1333 = 0.4933
+    //   C (priority=4): 0.6·(6-4)/5 + 0.4·(1/3) = 0.24 + 0.1333 = 0.3733
+    // → B 가 1등, C 가 2등.
     const tasks = [
       mkTask('a', [], { status: 'done', priority: 3 }),
       mkTask('b', ['a'], { priority: 3 }),
@@ -204,8 +233,10 @@ describe('computeRecommendations', () => {
       mkTask('d', ['b', 'c'], { priority: 5 }),
     ];
     const recs = computeRecommendations(tasks);
-    expect(recs.map((r) => r.task.id)).toEqual(['c', 'b']);
+    expect(recs.map((r) => r.task.id)).toEqual(['b', 'c']);
     expect(recs[0].impact).toBe(1);
     expect(recs[0].score).toBeGreaterThan(recs[1].score);
+    expect(recs[0].unlocks).toEqual(['d']);
+    expect(recs[1].unlocks).toEqual(['d']);
   });
 });

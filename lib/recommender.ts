@@ -12,6 +12,7 @@ export type Recommendation = {
     priorityComponent: number;
     impactComponent: number;
   };
+  unlocks: string[];
 };
 
 export class RecommenderCycleError extends Error {
@@ -36,7 +37,7 @@ export function computeReadySet(tasks: Task[]): Task[] {
   });
 }
 
-export function computeImpact(tasks: Task[]): Map<string, number> {
+export function computeImpactSet(tasks: Task[]): Map<string, Set<string>> {
   const downstream = new Map<string, string[]>();
   for (const t of tasks) {
     for (const p of t.prerequisites) {
@@ -63,8 +64,15 @@ export function computeImpact(tasks: Task[]): Map<string, number> {
     return result;
   }
 
+  const out = new Map<string, Set<string>>();
+  for (const t of tasks) out.set(t.id, dfs(t.id));
+  return out;
+}
+
+export function computeImpact(tasks: Task[]): Map<string, number> {
+  const sets = computeImpactSet(tasks);
   const out = new Map<string, number>();
-  for (const t of tasks) out.set(t.id, dfs(t.id).size);
+  for (const [id, set] of sets) out.set(id, set.size);
   return out;
 }
 
@@ -74,7 +82,9 @@ export function computeScore(
   maxImpact: number,
   weights: Weights = DEFAULT_WEIGHTS,
 ): { score: number; breakdown: Recommendation['breakdown'] } {
-  const priorityComponent = weights.wPriority * (task.priority / 5);
+  // priority 1 이 가장 높음 → (6 - priority) / 5 로 정규화
+  // priority=1 → 1.0, priority=5 → 0.2
+  const priorityComponent = weights.wPriority * ((6 - task.priority) / 5);
   const impactComponent =
     maxImpact === 0 ? 0 : weights.wImpact * (impact / maxImpact);
   return {
@@ -122,22 +132,31 @@ export function computeRecommendations(
   const ready = computeReadySet(tasks);
   if (ready.length === 0) return [];
 
-  const impactMap = computeImpact(tasks);
+  const impactSet = computeImpactSet(tasks);
   let maxImpact = 0;
-  for (const v of impactMap.values()) {
-    if (v > maxImpact) maxImpact = v;
+  for (const set of impactSet.values()) {
+    if (set.size > maxImpact) maxImpact = set.size;
   }
 
   const recs: Recommendation[] = ready.map((task) => {
-    const impact = impactMap.get(task.id) ?? 0;
+    const set = impactSet.get(task.id) ?? new Set<string>();
+    const impact = set.size;
     const { score, breakdown } = computeScore(task, impact, maxImpact, weights);
-    return { task, ready: true, impact, score, breakdown };
+    return {
+      task,
+      ready: true,
+      impact,
+      score,
+      breakdown,
+      unlocks: Array.from(set),
+    };
   });
 
   recs.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    if (b.task.priority !== a.task.priority) {
-      return b.task.priority - a.task.priority;
+    // priority 1 이 가장 높음 → ASC 정렬
+    if (a.task.priority !== b.task.priority) {
+      return a.task.priority - b.task.priority;
     }
     const aDue = a.task.dueDate ? Date.parse(a.task.dueDate) : Infinity;
     const bDue = b.task.dueDate ? Date.parse(b.task.dueDate) : Infinity;

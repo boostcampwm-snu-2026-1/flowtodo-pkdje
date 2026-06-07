@@ -227,7 +227,7 @@ export function TaskDrawer() {
 
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">
-            우선순위
+            우선순위 <span className="text-slate-400">(1 = 가장 높음)</span>
           </label>
           <div className="flex gap-1">
             {PRIORITIES.map((p) => (
