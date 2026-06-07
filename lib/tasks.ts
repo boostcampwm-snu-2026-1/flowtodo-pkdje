@@ -4,7 +4,7 @@ import clientPromise from '@/lib/mongo';
 // ---------- types ----------
 
 export type Status = 'todo' | 'in_progress' | 'done';
-export type Priority = 1 | 2 | 3 | 4 | 5;
+export type Priority = 1 | 2 | 3 | 4 | 5; // 1 = 가장 높음
 
 /** DB 문서 형태 (내부) */
 export type TaskDoc = {

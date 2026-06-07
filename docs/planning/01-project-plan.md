@@ -72,7 +72,7 @@ type Task = {
   title: string                       // 필수
   description?: string                // 선택, markdown 허용
   status: 'todo' | 'in_progress' | 'done'
-  priority: 1 | 2 | 3 | 4 | 5         // 5 = 가장 높음
+  priority: 1 | 2 | 3 | 4 | 5         // 1 = 가장 높음
   dueDate?: Date                      // 선택
   prerequisites: ObjectId[]           // 시작 가능하려면 끝나야 하는 작업들
   createdAt: Date
@@ -106,7 +106,8 @@ impact(t) = | { u : u 가 t 에 (직간접) 의존하고 u.status ≠ 'done' } |
 
 ### 5.3 점수
 ```
-score(t) = w_p · (priority(t) / 5) + w_i · (impact(t) / maxImpact)
+// priority 1 이 가장 높음 → (6 - priority) / 5 로 정규화
+score(t) = w_p · ((6 - priority(t)) / 5) + w_i · (impact(t) / maxImpact)
          (기본 w_p = 0.6, w_i = 0.4)
 ```
 
