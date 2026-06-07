@@ -50,11 +50,13 @@ export function computeRecommendations(
 ```
 
 `computeRecommendations` 는:
-1. `hasCycle(tasks)` 가드 → cycle 있으면 `RecommenderCycleError` throw
+1. 내부 헬퍼 `detectCycle(tasks)` 가드 → cycle 있으면 `RecommenderCycleError` throw
 2. `computeReadySet(tasks)` 로 ready 필터
 3. `computeImpact(tasks)` 로 전체 그래프의 impact map 계산 (maxImpact 도 여기서)
 4. 각 ready 에 대해 `computeScore` 적용
 5. 정렬 후 반환
+
+> `lib/tasks.ts` 의 `hasCycle` 은 server-side `TaskDoc` (`ObjectId` 기반) 시그니처라 client-side `Task[]` 에 그대로 재사용 못 함. recommender 내부에 동일한 3-color DFS 알고리즘을 client-side 타입으로 다시 구현하는 비-export 헬퍼 `detectCycle` 을 둔다.
 
 ## 3. Ready Set
 
@@ -120,7 +122,7 @@ function computeImpact(tasks: Task[]): Map<string, number> {
 ### 4.4 사이클 처리
 
 - `computeImpact` 자체는 memo 가 캐시해 무한루프는 안 빠지지만 결과가 의미 없음.
-- 진입점 `computeRecommendations` 가 `hasCycle` 가드를 함. `computeImpact` 를 단독 호출하는 케이스(테스트 포함) 는 호출자 책임.
+- 진입점 `computeRecommendations` 가 내부 `detectCycle` 가드를 함. `computeImpact` 를 단독 호출하는 케이스(테스트 포함) 는 호출자 책임.
 
 ## 5. Score
 
@@ -231,7 +233,7 @@ vi.mock('@/lib/mongo', () => ({ default: Promise.resolve(null) }));
 |---|----------|-----------|
 | 1 | 파일은 `lib/recommender.ts` | 이슈 본문 명시. #21 의 `lib/quest.ts` 는 별개. |
 | 2 | 3개 단위 함수 + 1개 컴포지트 | 단위 테스트 용이 + #14 가 컴포지트만 쓰면 됨. |
-| 3 | `hasCycle` 가드는 컴포지트에만 | 단위 함수는 가벼움 유지, 진입점에서만 비용. |
+| 3 | 사이클 가드(`detectCycle`)는 컴포지트에만, 내부 헬퍼로 재구현 | 단위 함수는 가벼움 유지, 진입점에서만 비용. `lib/tasks` 의 `hasCycle` 은 server 타입 시그니처라 client 그래프엔 재사용 불가. |
 | 4 | maxImpact === 0 → impactComponent 0 | impact 정보가 없으면 priority 만으로 정렬. 해석 명확. |
 | 5 | Tie-break 5단계 결정적 | 안정성 + "오래된 todo 가 묻히지 않음". |
 | 6 | dangling prereq = "완료" 처리 | 서버 cascade detach 직후 안전한 fallback. |
