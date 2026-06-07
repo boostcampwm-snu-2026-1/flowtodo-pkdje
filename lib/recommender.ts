@@ -121,6 +121,27 @@ function detectCycle(tasks: Task[]): boolean {
   return false;
 }
 
+export function wouldCreateCycle(
+  tasks: Task[],
+  source: string,
+  target: string,
+): boolean {
+  // 자기 자신을 prereq → 즉시 사이클
+  if (source === target) return true;
+
+  const targetTask = tasks.find((t) => t.id === target);
+  if (!targetTask) return false; // target 자체가 없으면 추가 불가
+  if (targetTask.prerequisites.includes(source)) return false; // 이미 있는 엣지 → 변화 없음
+  if (!tasks.some((t) => t.id === source)) return false; // dangling source → 사이클 불가
+
+  const candidate = tasks.map((t) =>
+    t.id === target
+      ? { ...t, prerequisites: [...t.prerequisites, source] }
+      : t,
+  );
+  return detectCycle(candidate);
+}
+
 export function computeRecommendations(
   tasks: Task[],
   weights: Weights = DEFAULT_WEIGHTS,

@@ -1,11 +1,18 @@
 'use client';
 
 import 'reactflow/dist/style.css';
-import { useEffect, useMemo, useRef } from 'react';
-import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  type Connection,
+  type Edge,
+} from 'reactflow';
 import { TaskNode } from './TaskNode';
 import { applyLayout, buildGraph } from '@/lib/dag';
 import { useAppStore } from '@/lib/store';
+import { wouldCreateCycle } from '@/lib/recommender';
 import type { Status, Task } from '@/lib/tasks';
 
 const nodeTypes = { task: TaskNode };
@@ -18,6 +25,17 @@ export function Canvas() {
 
   const clickTimer = useRef<number | null>(null);
   const togglingRef = useRef<Set<string>>(new Set());
+  const [edgeError, setEdgeError] = useState<string | null>(null);
+  const errorTimerRef = useRef<number | null>(null);
+
+  function showError(msg: string) {
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    setEdgeError(msg);
+    errorTimerRef.current = window.setTimeout(() => {
+      setEdgeError(null);
+      errorTimerRef.current = null;
+    }, 1600);
+  }
 
   const handleNodeClick = (_: unknown, node: { id: string }) => {
     if (clickTimer.current !== null) return;
@@ -50,6 +68,46 @@ export function Canvas() {
     }
   };
 
+  const isValidConnection = (conn: Connection) => {
+    const tasksNow = useAppStore.getState().tasks;
+    if (!conn.source || !conn.target) return false;
+    return !wouldCreateCycle(tasksNow, conn.source, conn.target);
+  };
+
+  const onConnect = async (conn: Connection) => {
+    if (!conn.source || !conn.target) return;
+    const tasksNow = useAppStore.getState().tasks;
+    if (wouldCreateCycle(tasksNow, conn.source, conn.target)) {
+      showError('순환 의존성이 생겨 거부됨');
+      return;
+    }
+    const target = tasksNow.find((t) => t.id === conn.target);
+    if (!target) return;
+    if (target.prerequisites.includes(conn.source)) return; // 중복 silent
+    try {
+      await useAppStore.getState().updateTask(target.id, {
+        prerequisites: [...target.prerequisites, conn.source],
+      });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const onEdgeClick = async (_: unknown, edge: Edge) => {
+    const ok = window.confirm('이 의존성을 삭제할까요?');
+    if (!ok) return;
+    const tasksNow = useAppStore.getState().tasks;
+    const target = tasksNow.find((t) => t.id === edge.target);
+    if (!target) return;
+    try {
+      await useAppStore.getState().updateTask(target.id, {
+        prerequisites: target.prerequisites.filter((p) => p !== edge.source),
+      });
+    } catch (err) {
+      showError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
@@ -59,6 +117,10 @@ export function Canvas() {
       if (clickTimer.current !== null) {
         clearTimeout(clickTimer.current);
         clickTimer.current = null;
+      }
+      if (errorTimerRef.current !== null) {
+        clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
       }
     };
   }, []);
@@ -94,6 +156,10 @@ export function Canvas() {
           maxZoom={2}
           onNodeClick={handleNodeClick}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onConnect={onConnect}
+          onEdgeClick={onEdgeClick}
+          isValidConnection={isValidConnection}
+          deleteKeyCode={null}
           defaultEdgeOptions={{
             style: { stroke: '#94a3b8', strokeWidth: 1.5 },
           }}
@@ -121,6 +187,11 @@ export function Canvas() {
             }
           />
         </ReactFlow>
+      )}
+      {edgeError && (
+        <div className="absolute right-4 top-4 z-10 rounded-md bg-red-500 px-3 py-2 text-xs font-medium text-white shadow-lg">
+          {edgeError}
+        </div>
       )}
     </main>
   );

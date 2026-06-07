@@ -11,6 +11,7 @@ import {
   computeRecommendations,
   computeScore,
   RecommenderCycleError,
+  wouldCreateCycle,
 } from '@/lib/recommender';
 
 function mkTask(
@@ -238,5 +239,28 @@ describe('computeRecommendations', () => {
     expect(recs[0].score).toBeGreaterThan(recs[1].score);
     expect(recs[0].unlocks).toEqual(['d']);
     expect(recs[1].unlocks).toEqual(['d']);
+  });
+});
+
+describe('wouldCreateCycle', () => {
+  it('self-loop A→A is a cycle', () => {
+    expect(wouldCreateCycle([mkTask('a')], 'a', 'a')).toBe(true);
+  });
+
+  it('A→B in independent graph is not a cycle', () => {
+    expect(wouldCreateCycle([mkTask('a'), mkTask('b')], 'a', 'b')).toBe(false);
+  });
+
+  it('A→B when A.prereq already includes B → would create cycle', () => {
+    // A.prereq=[B] 이미 있음 (즉 B→A 엣지). 새로 A→B 추가하면 사이클.
+    const tasks = [mkTask('a', ['b']), mkTask('b')];
+    expect(wouldCreateCycle(tasks, 'a', 'b')).toBe(true);
+  });
+
+  it('indirect cycle: A→B→C chain, adding C→A creates cycle', () => {
+    // 의존성 방향: A 가 시작, B 는 A 필요, C 는 B 필요.
+    // C→A 엣지 = A.prereq 에 C 추가 → A 가 C 에 의존, C 는 B 경유로 A 에 의존 → 사이클.
+    const tasks = [mkTask('a'), mkTask('b', ['a']), mkTask('c', ['b'])];
+    expect(wouldCreateCycle(tasks, 'c', 'a')).toBe(true);
   });
 });
