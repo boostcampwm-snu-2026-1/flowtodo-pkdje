@@ -1,3 +1,5 @@
+import { NextQuestPanel } from './NextQuestPanel';
+
 function PlaceholderBox({ note }: { note: string }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-xs text-slate-400">
@@ -20,7 +22,7 @@ function Section({ label, note }: { label: string; note: string }) {
 export function Sidebar() {
   return (
     <aside className="w-80 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-4">
-      <Section label="▶ NEXT QUEST" note="추천 카드는 #14 에서 채워집니다" />
+      <NextQuestPanel />
       <Section
         label="⚡ SIDE QUESTS"
         note="사이드 퀘스트는 #23 에서 채워집니다"
