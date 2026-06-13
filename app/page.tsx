@@ -4,6 +4,7 @@ import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from './components/Canvas';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { Header } from './components/Header';
+import { SettingsModal } from './components/SettingsModal';
 import { Sidebar } from './components/Sidebar';
 import { TaskDrawer } from './components/TaskDrawer';
 import { ToastContainer } from './components/ToastContainer';
@@ -19,6 +20,7 @@ export default function Home() {
           <TaskDrawer />
         </div>
         <CreateTaskModal />
+        <SettingsModal />
         <ToastContainer />
       </div>
     </ReactFlowProvider>

@@ -20,6 +20,7 @@ export function NextQuestPanel() {
   const selectTask = useAppStore((s) => s.selectTask);
   const pinnedIds = useAppStore((s) => s.pinnedIds);
   const snoozeUntil = useAppStore((s) => s.snoozeUntil);
+  const weights = useAppStore((s) => s.weights);
   const togglePin = useAppStore((s) => s.togglePin);
   const snoozeTask = useAppStore((s) => s.snoozeTask);
   const unsnoozeTask = useAppStore((s) => s.unsnoozeTask);
@@ -35,12 +36,12 @@ export function NextQuestPanel() {
 
   const result: ComputeResult = useMemo(() => {
     try {
-      return { kind: 'ok', recs: computeRecommendations(tasks) };
+      return { kind: 'ok', recs: computeRecommendations(tasks, weights) };
     } catch (err) {
       if (err instanceof RecommenderCycleError) return { kind: 'cycle' };
       throw err;
     }
-  }, [tasks]);
+  }, [tasks, weights]);
 
   const titleById = useMemo(() => {
     const m = new Map<string, string>();
