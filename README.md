@@ -4,7 +4,7 @@
 
 > Boostcamp WM SNU 2026 · 3주 개인 프로젝트 (박동제 / [@pkdje](https://github.com/pkdje))
 
-**현재 상태**: Week 3 진행 중 — GitHub OAuth 인증 + Vercel 배포 (#19) 완료. polish/시각 리뉴얼 진행 예정.
+**현재 상태**: Week 3 완료 — 모든 feature 이슈 머지. 남은 건 회고(#20) 와 사용자 손이 필요한 Vercel/OAuth App 등록뿐.
 
 ---
 
@@ -20,6 +20,10 @@
 - **다음 작업 추천** — 좌측 `▶ NEXT QUEST` 패널에 Top 3 카드 표시. 점수 = `0.6 · (6-priority)/5 + 0.4 · impact/maxImpact`. 카드 클릭 시 캔버스가 해당 노드로 카메라 이동. 각 카드는 "▷ X, Y 해금" 다운스트림 미리보기 포함.
 - **상태 관리** — Zustand store ([lib/store.ts](lib/store.ts)) 가 tasks · 모달 · 드로어 · 추천 모두 한 곳에서 관리.
 - **사용자 인증** — NextAuth.js v4 + GitHub OAuth. JWT 세션. 각 task 가 `userId` 로 격리되어 본인 것만 보임 (#19).
+- **퀘스트 카드 노드** — 상태별 톤 (ready / 🔒 LOCKED / in_progress / ✓ CLEARED), 새로 ready 가 된 노드에 0.9초 펄스 (lib/quest.detectUnlocks) (#22).
+- **사이드 패널** — `▶ NEXT QUEST` (Top 3) · `⚡ SIDE QUESTS` (단독 태스크) · 진행 현황 (메인 X/Y · 사이드 X/Y) (#23).
+- **추천 보강** — 카드 hover 시 📌 (상단 고정) / 💤 (24h snooze) 액션, 가중치 슬라이더로 priority↔impact 즉시 재계산 (#15, #17). localStorage 영구 저장.
+- **토스트 인프라** — 사이클 거부 / 네트워크 에러 / 추천 변화 모두 통일된 우상단 stack (#18).
 
 자세한 기획: [Wiki — 프로젝트 기획서](../../wiki/01-project-plan)
 퀘스트 게임 UI 디테일: [Wiki — Quest Game UI](../../wiki/04-quest-game-ui)
@@ -37,7 +41,7 @@
 | 상태관리 | Zustand 5.x | tasks · createModalOpen · selectedTaskId · selectTask/updateTask/deleteTask 등 |
 | 스타일 | Tailwind 3.4 + Prettier plugin | |
 | 인증 | NextAuth.js v4 (Auth.js) + GitHub OAuth | JWT session, `lib/auth.ts` |
-| 테스트 | Vitest 4.1 (3 파일, 43 케이스) | `lib/tasks.test.ts`, `lib/dag.test.ts`, `lib/recommender.test.ts` |
+| 테스트 | Vitest 4.1 (4 파일, 61 케이스) | `lib/tasks.test.ts`, `lib/dag.test.ts`, `lib/recommender.test.ts`, `lib/quest.test.ts` |
 | 배포 | Vercel + Atlas | 환경변수 5개 (아래 §배포 참조) |
 
 선택 이유: [Wiki — 프로젝트 기획서 §3](../../wiki/01-project-plan#3-기술-스택-및-선택-이유)
@@ -162,7 +166,7 @@ Atlas → Network Access → `0.0.0.0/0` 허용 (Vercel serverless 가 정적 IP
 |---|---|---|
 | Week 1 | ✅ 완료 | [기획서](../../wiki/01-project-plan), [워크플로우](../../wiki/02-agent-workflow), [Task 백로그](docs/planning/03-task-backlog.md), 스파이크 #2 |
 | Week 2 | ✅ 완료 | CRUD API · DAG 렌더 · 추천 엔진 · NEXT QUEST 패널 · 편집 드로어 · 엣지 드래그 ([회고](../../wiki/Weekly-Retrospective#week-2)) |
-| Week 3 | 🟡 진행 중 | **#19 인증 + 배포 완료**. 남음: polish (#18), 퀘스트 카드 노드 (#22), 사이드 패널 (#23), 핀/snooze (#15), 가중치 슬라이더 (#17) |
+| Week 3 | ✅ 기능 완료 | #15 핀/snooze · #17 가중치 슬라이더 · #18 polish · #19 인증+배포 준비 · #21 lib/quest · #22 퀘스트 카드 노드 · #23 사이드 패널/이모지. 남음: **#20 회고** + Vercel/OAuth App 등록 (사용자) |
 
 배포 URL: _Vercel 대시보드에서 도메인 추가 후 여기에 표시_
 
