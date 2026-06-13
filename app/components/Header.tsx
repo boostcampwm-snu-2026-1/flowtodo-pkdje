@@ -5,6 +5,7 @@ import { useAppStore } from '@/lib/store';
 
 export function Header() {
   const openCreateModal = useAppStore((s) => s.openCreateModal);
+  const openSettings = useAppStore((s) => s.openSettings);
   const { data: session, status } = useSession();
 
   return (
@@ -21,6 +22,7 @@ export function Header() {
         <button
           type="button"
           aria-label="설정"
+          onClick={openSettings}
           className="rounded-md p-2 text-slate-600 transition-colors hover:bg-slate-100"
         >
           ⚙

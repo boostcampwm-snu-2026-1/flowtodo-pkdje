@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CreateTaskInput, Task, UpdateTaskInput } from '@/lib/tasks';
+import { DEFAULT_WEIGHTS, type Weights } from '@/lib/recommender';
 
 type TasksStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -21,6 +22,8 @@ type AppState = {
   toasts: Toast[];
   pinnedIds: string[];
   snoozeUntil: Record<string, number>;
+  weights: Weights;
+  settingsModalOpen: boolean;
 
   fetchTasks: () => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task>;
@@ -38,6 +41,10 @@ type AppState = {
   togglePin: (id: string) => void;
   snoozeTask: (id: string) => void;
   unsnoozeTask: (id: string) => void;
+  setWeights: (weights: Weights) => void;
+  resetWeights: () => void;
+  openSettings: () => void;
+  closeSettings: () => void;
 };
 
 export const useAppStore = create<AppState>()(
@@ -51,6 +58,8 @@ export const useAppStore = create<AppState>()(
       toasts: [],
       pinnedIds: [],
       snoozeUntil: {},
+      weights: DEFAULT_WEIGHTS,
+      settingsModalOpen: false,
 
       fetchTasks: async () => {
         set({ tasksStatus: 'loading', tasksError: null });
@@ -165,6 +174,11 @@ export const useAppStore = create<AppState>()(
           delete next[id];
           return { snoozeUntil: next };
         }),
+
+      setWeights: (weights) => set({ weights }),
+      resetWeights: () => set({ weights: DEFAULT_WEIGHTS }),
+      openSettings: () => set({ settingsModalOpen: true }),
+      closeSettings: () => set({ settingsModalOpen: false }),
     }),
     {
       name: 'flowtodo-prefs',
@@ -172,6 +186,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         pinnedIds: state.pinnedIds,
         snoozeUntil: state.snoozeUntil,
+        weights: state.weights,
       }),
     },
   ),
