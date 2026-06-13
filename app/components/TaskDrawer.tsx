@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { Priority, Status, Task, UpdateTaskInput } from '@/lib/tasks';
+import { EmojiPicker } from './EmojiPicker';
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4, 5];
 const STATUSES: { value: Status; label: string }[] = [
@@ -18,6 +19,7 @@ type FormState = {
   priority: Priority;
   dueDate: string; // YYYY-MM-DD, '' = 없음
   prerequisites: string[];
+  icon: string;
 };
 
 function toDateInput(iso: string | undefined): string {
@@ -38,6 +40,7 @@ function toFormState(task: Task): FormState {
     priority: task.priority,
     dueDate: toDateInput(task.dueDate),
     prerequisites: [...task.prerequisites],
+    icon: task.icon ?? '⚡',
   };
 }
 
@@ -58,6 +61,7 @@ function diffPatch(original: Task, form: FormState): UpdateTaskInput {
   if (originalPrereqs !== formPrereqs) {
     patch.prerequisites = form.prerequisites;
   }
+  if (form.icon !== (original.icon ?? '⚡')) patch.icon = form.icon;
   return patch;
 }
 
@@ -187,6 +191,11 @@ export function TaskDrawer() {
         onSubmit={handleSave}
         className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 text-sm"
       >
+        <EmojiPicker
+          value={form.icon}
+          onChange={(next) => setForm({ ...form, icon: next ?? '⚡' })}
+        />
+
         <div>
           <label
             htmlFor="drawer-title"
