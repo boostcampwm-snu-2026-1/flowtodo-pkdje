@@ -13,6 +13,7 @@ function mkTask(
 ): Task {
   return {
     id,
+    userId: 'u1',
     title: `task-${id}`,
     status: 'todo',
     priority: 3,
