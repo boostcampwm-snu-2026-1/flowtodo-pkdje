@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { Priority } from '@/lib/tasks';
+import { EmojiPicker } from './EmojiPicker';
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4, 5];
 
@@ -16,6 +17,7 @@ export function CreateTaskModal() {
   const [priority, setPriority] = useState<Priority>(3);
   const [dueDate, setDueDate] = useState(''); // YYYY-MM-DD, '' = 없음
   const [prereqs, setPrereqs] = useState<string[]>([]);
+  const [icon, setIcon] = useState<string | undefined>('⚡');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +28,7 @@ export function CreateTaskModal() {
       setPriority(3);
       setDueDate('');
       setPrereqs([]);
+      setIcon('⚡');
       setSubmitting(false);
       setError(null);
     }
@@ -53,6 +56,7 @@ export function CreateTaskModal() {
         priority,
         prerequisites: prereqs,
         ...(dueDate ? { dueDate } : {}),
+        ...(icon ? { icon } : {}),
       });
       close();
     } catch (err) {
@@ -83,6 +87,8 @@ export function CreateTaskModal() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <EmojiPicker value={icon} onChange={setIcon} />
+
           <div>
             <label
               htmlFor="task-title"
