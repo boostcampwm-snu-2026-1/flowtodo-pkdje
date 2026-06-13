@@ -5,13 +5,19 @@ import {
   TaskCycleError,
   TaskNotFoundError,
   TaskValidationError,
+  type CreateTaskInput,
 } from '@/lib/tasks';
+import { getCurrentUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   try {
-    const tasks = await listTasks();
+    const tasks = await listTasks(userId);
     return NextResponse.json({ tasks });
   } catch (error) {
     console.error('[tasks GET] failed:', error);
@@ -20,6 +26,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -28,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const task = await createTask(body as Parameters<typeof createTask>[0]);
+    const task = await createTask(userId, body as CreateTaskInput);
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     if (error instanceof TaskValidationError) {

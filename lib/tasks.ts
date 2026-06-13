@@ -9,6 +9,7 @@ export type Priority = 1 | 2 | 3 | 4 | 5; // 1 = 가장 높음
 /** DB 문서 형태 (내부) */
 export type TaskDoc = {
   _id: ObjectId;
+  userId: string; // GitHub profile.id (string)
   title: string;
   description?: string;
   status: Status;
@@ -23,6 +24,7 @@ export type TaskDoc = {
 /** API 응답 형태 (외부) — id 는 string, 날짜는 ISO */
 export type Task = {
   id: string;
+  userId: string;
   title: string;
   description?: string;
   status: Status;
@@ -74,6 +76,7 @@ export class TaskCycleError extends Error {
 export function serializeTask(doc: TaskDoc): Task {
   return {
     id: doc._id.toString(),
+    userId: doc.userId,
     title: doc.title,
     description: doc.description,
     status: doc.status,
@@ -112,13 +115,16 @@ function validateStatus(s: unknown): Status {
 
 // ---------- public DB ops ----------
 
-export async function listTasks(): Promise<Task[]> {
+export async function listTasks(userId: string): Promise<Task[]> {
   const col = await getCollection();
-  const docs = await col.find({}).toArray();
+  const docs = await col.find({ userId }).toArray();
   return docs.map(serializeTask);
 }
 
-export async function createTask(input: CreateTaskInput): Promise<Task> {
+export async function createTask(
+  userId: string,
+  input: CreateTaskInput,
+): Promise<Task> {
   if (typeof input.title !== 'string' || input.title.trim() === '') {
     throw new TaskValidationError(
       'title is required and must be non-empty string',
@@ -139,10 +145,10 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 
   const col = await getCollection();
 
-  // verify prerequisites exist
+  // verify prerequisites exist within this user's tasks
   if (prereqIds.length > 0) {
     const existing = await col
-      .find({ _id: { $in: prereqIds } }, { projection: { _id: 1 } })
+      .find({ _id: { $in: prereqIds }, userId }, { projection: { _id: 1 } })
       .toArray();
     if (existing.length !== prereqIds.length) {
       const found = new Set(existing.map((t) => t._id.toString()));
@@ -155,6 +161,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 
   const now = new Date();
   const doc: Omit<TaskDoc, '_id'> = {
+    userId,
     title: input.title.trim(),
     description: input.description,
     status,
@@ -170,13 +177,14 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 }
 
 export async function updateTask(
+  userId: string,
   id: string,
   input: UpdateTaskInput,
 ): Promise<Task> {
   const _id = toObjectId(id, 'id');
   const col = await getCollection();
 
-  const existing = await col.findOne({ _id });
+  const existing = await col.findOne({ _id, userId });
   if (!existing) throw new TaskNotFoundError(id);
 
   // build $set patch with validated fields
@@ -202,20 +210,20 @@ export async function updateTask(
       toObjectId(p, 'prerequisite'),
     );
 
-    // verify all referenced prereqs exist (other than self — caught by cycle check)
+    // verify all referenced prereqs exist within this user (other than self — caught by cycle check)
     const others = newPrereqs.filter((p) => !p.equals(_id));
     if (others.length > 0) {
       const existingPrereqs = await col
-        .find({ _id: { $in: others } }, { projection: { _id: 1 } })
+        .find({ _id: { $in: others }, userId }, { projection: { _id: 1 } })
         .toArray();
       if (existingPrereqs.length !== others.length) {
         throw new TaskValidationError('one or more prerequisites do not exist');
       }
     }
 
-    // cycle check on proposed state
+    // cycle check on proposed state (this user only)
     const allTasks = await col
-      .find({}, { projection: { _id: 1, prerequisites: 1 } })
+      .find({ userId }, { projection: { _id: 1, prerequisites: 1 } })
       .toArray();
     const proposed = allTasks.map((t) =>
       t._id.equals(_id) ? { _id: t._id, prerequisites: newPrereqs } : t,
@@ -226,7 +234,7 @@ export async function updateTask(
   }
 
   const result = await col.findOneAndUpdate(
-    { _id },
+    { _id, userId },
     { $set: set },
     { returnDocument: 'after' },
   );
@@ -235,21 +243,25 @@ export async function updateTask(
 }
 
 export async function deleteTask(
+  userId: string,
   id: string,
 ): Promise<{ deleted: boolean; cascadeFrom: number }> {
   const _id = toObjectId(id, 'id');
   const col = await getCollection();
 
-  const existing = await col.findOne({ _id }, { projection: { _id: 1 } });
+  const existing = await col.findOne(
+    { _id, userId },
+    { projection: { _id: 1 } },
+  );
   if (!existing) throw new TaskNotFoundError(id);
 
-  // cascade: remove this id from any other task's prerequisites
+  // cascade: remove this id from this user's other tasks' prerequisites
   const cascade = await col.updateMany(
-    { prerequisites: _id },
+    { userId, prerequisites: _id },
     { $pull: { prerequisites: _id }, $set: { updatedAt: new Date() } },
   );
 
-  await col.deleteOne({ _id });
+  await col.deleteOne({ _id, userId });
   return { deleted: true, cascadeFrom: cascade.modifiedCount };
 }
 
