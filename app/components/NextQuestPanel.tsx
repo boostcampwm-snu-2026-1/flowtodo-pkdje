@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useReactFlow } from 'reactflow';
-import { useAppStore } from '@/lib/store';
+import { isSnoozedNow, useAppStore } from '@/lib/store';
 import {
   computeRecommendations,
   type Recommendation,
@@ -18,7 +18,20 @@ export function NextQuestPanel() {
   const tasks = useAppStore((s) => s.tasks);
   const status = useAppStore((s) => s.tasksStatus);
   const selectTask = useAppStore((s) => s.selectTask);
+  const pinnedIds = useAppStore((s) => s.pinnedIds);
+  const snoozeUntil = useAppStore((s) => s.snoozeUntil);
+  const togglePin = useAppStore((s) => s.togglePin);
+  const snoozeTask = useAppStore((s) => s.snoozeTask);
+  const unsnoozeTask = useAppStore((s) => s.unsnoozeTask);
   const { setCenter, getNode } = useReactFlow();
+
+  // 만료된 snooze 자동 정리
+  useEffect(() => {
+    const now = Date.now();
+    for (const [id, until] of Object.entries(snoozeUntil)) {
+      if (until <= now) unsnoozeTask(id);
+    }
+  }, [snoozeUntil, unsnoozeTask]);
 
   const result: ComputeResult = useMemo(() => {
     try {
@@ -35,7 +48,21 @@ export function NextQuestPanel() {
     return m;
   }, [tasks]);
 
-  const top = result.kind === 'ok' ? result.recs.slice(0, TOP_N) : [];
+  // pinned 가 위로 + snoozed 제외
+  const ordered = useMemo(() => {
+    if (result.kind !== 'ok') return [];
+    const pinnedSet = new Set(pinnedIds);
+    const visible = result.recs.filter(
+      (r) => !isSnoozedNow(snoozeUntil, r.task.id),
+    );
+    return [
+      ...visible.filter((r) => pinnedSet.has(r.task.id)),
+      ...visible.filter((r) => !pinnedSet.has(r.task.id)),
+    ];
+  }, [result, pinnedIds, snoozeUntil]);
+
+  const top = ordered.slice(0, TOP_N);
+  const pinnedSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
 
   function focus(taskId: string) {
     const node = getNode(taskId);
@@ -59,7 +86,10 @@ export function NextQuestPanel() {
         status={status}
         recs={top}
         titleById={titleById}
+        pinnedSet={pinnedSet}
         onCardClick={focus}
+        onPin={togglePin}
+        onSnooze={snoozeTask}
       />
     </section>
   );
@@ -70,13 +100,19 @@ function PanelBody({
   status,
   recs,
   titleById,
+  pinnedSet,
   onCardClick,
+  onPin,
+  onSnooze,
 }: {
   result: ComputeResult;
   status: 'idle' | 'loading' | 'ready' | 'error';
   recs: Recommendation[];
   titleById: Map<string, string>;
+  pinnedSet: Set<string>;
   onCardClick: (id: string) => void;
+  onPin: (id: string) => void;
+  onSnooze: (id: string) => void;
 }) {
   if (status === 'idle' || status === 'loading') {
     return <Placeholder text="로딩 중..." />;
@@ -101,8 +137,11 @@ function PanelBody({
           <QuestCard
             rec={r}
             isLeader={i === 0}
+            isPinned={pinnedSet.has(r.task.id)}
             unlocksLabel={formatUnlocks(r.unlocks, titleById)}
             onClick={() => onCardClick(r.task.id)}
+            onPin={() => onPin(r.task.id)}
+            onSnooze={() => onSnooze(r.task.id)}
           />
         </li>
       ))}
@@ -113,40 +152,80 @@ function PanelBody({
 function QuestCard({
   rec,
   isLeader,
+  isPinned,
   unlocksLabel,
   onClick,
+  onPin,
+  onSnooze,
 }: {
   rec: Recommendation;
   isLeader: boolean;
+  isPinned: boolean;
   unlocksLabel: string | null;
   onClick: () => void;
+  onPin: () => void;
+  onSnooze: () => void;
 }) {
   // priority 1 이 가장 높음 → 6-priority 만큼 채움
   const filled = 6 - rec.task.priority;
   const stars = '★'.repeat(filled) + '☆'.repeat(5 - filled);
   const tone = isLeader
     ? 'border-orange-500 bg-orange-50'
-    : 'border-slate-300 bg-white';
+    : isPinned
+      ? 'border-amber-400 bg-amber-50'
+      : 'border-slate-300 bg-white';
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-lg border-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 ${tone}`}
+    <div
+      className={`group relative rounded-lg border-2 transition-colors hover:bg-slate-50 ${tone}`}
     >
-      <div className="flex items-center gap-1 text-sm font-medium text-slate-900">
-        <span>⚡</span>
-        <span className="truncate">{rec.task.title}</span>
-      </div>
-      <div className="mt-1 text-xs text-amber-500">{stars}</div>
-      <div className="text-[11px] text-slate-500">
-        score {rec.score.toFixed(2)}
-      </div>
-      {unlocksLabel && (
-        <div className="mt-1 truncate text-[11px] text-slate-600">
-          ▷ {unlocksLabel} 해금
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full px-3 py-2 text-left"
+      >
+        <div className="flex items-center gap-1 text-sm font-medium text-slate-900">
+          <span>{rec.task.icon ?? '⚡'}</span>
+          <span className="truncate">{rec.task.title}</span>
         </div>
-      )}
-    </button>
+        <div className="mt-1 text-xs text-amber-500">{stars}</div>
+        <div className="text-[11px] text-slate-500">
+          score {rec.score.toFixed(2)}
+        </div>
+        {unlocksLabel && (
+          <div className="mt-1 truncate text-[11px] text-slate-600">
+            ▷ {unlocksLabel} 해금
+          </div>
+        )}
+      </button>
+      <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPin();
+          }}
+          aria-label={isPinned ? '핀 해제' : '상단 고정'}
+          className={`rounded p-1 text-xs hover:bg-slate-100 ${
+            isPinned ? 'text-amber-600' : 'text-slate-500'
+          }`}
+          title={isPinned ? '핀 해제' : '상단 고정'}
+        >
+          📌
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSnooze();
+          }}
+          aria-label="24시간 숨김"
+          className="rounded p-1 text-xs text-slate-500 hover:bg-slate-100"
+          title="24시간 숨김"
+        >
+          💤
+        </button>
+      </div>
+    </div>
   );
 }
 
