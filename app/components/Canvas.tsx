@@ -10,6 +10,8 @@ import ReactFlow, {
   type Edge,
 } from 'reactflow';
 import { TaskNode } from './TaskNode';
+import { EmptyState } from './EmptyState';
+import { SkeletonLoader } from './SkeletonLoader';
 import { applyLayout, buildGraph } from '@/lib/dag';
 import { useAppStore } from '@/lib/store';
 import { wouldCreateCycle } from '@/lib/recommender';
@@ -26,18 +28,11 @@ export function Canvas() {
 
   const clickTimer = useRef<number | null>(null);
   const togglingRef = useRef<Set<string>>(new Set());
-  const [edgeError, setEdgeError] = useState<string | null>(null);
-  const errorTimerRef = useRef<number | null>(null);
   const [unlockingIds, setUnlockingIds] = useState<Set<string>>(new Set());
   const prevTasksRef = useRef<Task[] | null>(null);
 
   function showError(msg: string) {
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    setEdgeError(msg);
-    errorTimerRef.current = window.setTimeout(() => {
-      setEdgeError(null);
-      errorTimerRef.current = null;
-    }, 1600);
+    useAppStore.getState().showToast(msg, 'error', 2400);
   }
 
   const handleNodeClick = (_: unknown, node: { id: string }) => {
@@ -121,12 +116,17 @@ export function Canvas() {
         clearTimeout(clickTimer.current);
         clickTimer.current = null;
       }
-      if (errorTimerRef.current !== null) {
-        clearTimeout(errorTimerRef.current);
-        errorTimerRef.current = null;
-      }
     };
   }, []);
+
+  // tasksStatus 가 'error' 가 되면 한 번만 토스트.
+  useEffect(() => {
+    if (status === 'error' && error) {
+      useAppStore
+        .getState()
+        .showToast(`불러오기 실패: ${error}`, 'error', 4000);
+    }
+  }, [status, error]);
 
   // 해금 펄스 감지: prev/next tasks 비교해 새로 ready 가 된 id 에 0.9초 애니메이션 부여.
   // 첫 fetch 결과는 skip (전체가 unlock 으로 폭발하는 것 방지).
@@ -163,18 +163,14 @@ export function Canvas() {
 
   return (
     <main className="relative flex-1 overflow-hidden bg-slate-100">
-      {(status === 'idle' || status === 'loading') && (
-        <CenterMessage text="로딩 중..." />
-      )}
+      {(status === 'idle' || status === 'loading') && <SkeletonLoader />}
       {status === 'error' && (
         <CenterMessage
           text={`불러오기 실패: ${error ?? 'unknown'}`}
           textClass="text-red-500"
         />
       )}
-      {status === 'ready' && tasks.length === 0 && (
-        <CenterMessage text="아직 태스크가 없습니다. 우측 상단 + 새 태스크 로 시작하세요." />
-      )}
+      {status === 'ready' && tasks.length === 0 && <EmptyState />}
       {status === 'ready' && layout && tasks.length > 0 && (
         <ReactFlow
           nodes={layout.nodes}
@@ -217,11 +213,6 @@ export function Canvas() {
             }
           />
         </ReactFlow>
-      )}
-      {edgeError && (
-        <div className="absolute right-4 top-4 z-10 rounded-md bg-red-500 px-3 py-2 text-xs font-medium text-white shadow-lg">
-          {edgeError}
-        </div>
       )}
     </main>
   );

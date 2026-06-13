@@ -3,12 +3,19 @@ import type { CreateTaskInput, Task, UpdateTaskInput } from '@/lib/tasks';
 
 type TasksStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+export type Toast = {
+  id: string;
+  message: string;
+  kind: 'info' | 'error';
+};
+
 type AppState = {
   tasks: Task[];
   tasksStatus: TasksStatus;
   tasksError: string | null;
   createModalOpen: boolean;
   selectedTaskId: string | null;
+  toasts: Toast[];
 
   fetchTasks: () => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task>;
@@ -17,6 +24,12 @@ type AppState = {
   openCreateModal: () => void;
   closeCreateModal: () => void;
   selectTask: (id: string | null) => void;
+  showToast: (
+    message: string,
+    kind?: 'info' | 'error',
+    durationMs?: number,
+  ) => void;
+  dismissToast: (id: string) => void;
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -25,6 +38,7 @@ export const useAppStore = create<AppState>((set) => ({
   tasksError: null,
   createModalOpen: false,
   selectedTaskId: null,
+  toasts: [],
 
   fetchTasks: async () => {
     set({ tasksStatus: 'loading', tasksError: null });
@@ -105,4 +119,18 @@ export const useAppStore = create<AppState>((set) => ({
   openCreateModal: () => set({ createModalOpen: true }),
   closeCreateModal: () => set({ createModalOpen: false }),
   selectTask: (id) => set({ selectedTaskId: id }),
+
+  showToast: (message, kind = 'error', durationMs = 2400) => {
+    const id = `t_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    set((state) => ({
+      toasts: [...state.toasts, { id, message, kind }],
+    }));
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        useAppStore.getState().dismissToast(id);
+      }, durationMs);
+    }
+  },
+  dismissToast: (id) =>
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 }));

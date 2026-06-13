@@ -6,6 +6,7 @@ import { CreateTaskModal } from './components/CreateTaskModal';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TaskDrawer } from './components/TaskDrawer';
+import { ToastContainer } from './components/ToastContainer';
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
           <TaskDrawer />
         </div>
         <CreateTaskModal />
+        <ToastContainer />
       </div>
     </ReactFlowProvider>
   );
