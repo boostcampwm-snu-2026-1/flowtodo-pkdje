@@ -8,9 +8,8 @@ import {
   type Recommendation,
   RecommenderCycleError,
 } from '@/lib/recommender';
+import { NODE_HEIGHT, NODE_WIDTH } from '@/lib/dag';
 
-const NODE_WIDTH = 150;
-const NODE_HEIGHT = 76;
 const TOP_N = 3;
 
 type ComputeResult = { kind: 'ok'; recs: Recommendation[] } | { kind: 'cycle' };
