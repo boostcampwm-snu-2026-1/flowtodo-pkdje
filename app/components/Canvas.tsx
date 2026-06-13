@@ -13,6 +13,7 @@ import { TaskNode } from './TaskNode';
 import { applyLayout, buildGraph } from '@/lib/dag';
 import { useAppStore } from '@/lib/store';
 import { wouldCreateCycle } from '@/lib/recommender';
+import { detectUnlocks } from '@/lib/quest';
 import type { Status, Task } from '@/lib/tasks';
 
 const nodeTypes = { task: TaskNode };
@@ -27,6 +28,8 @@ export function Canvas() {
   const togglingRef = useRef<Set<string>>(new Set());
   const [edgeError, setEdgeError] = useState<string | null>(null);
   const errorTimerRef = useRef<number | null>(null);
+  const [unlockingIds, setUnlockingIds] = useState<Set<string>>(new Set());
+  const prevTasksRef = useRef<Task[] | null>(null);
 
   function showError(msg: string) {
     if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
@@ -125,11 +128,38 @@ export function Canvas() {
     };
   }, []);
 
+  // 해금 펄스 감지: prev/next tasks 비교해 새로 ready 가 된 id 에 0.9초 애니메이션 부여.
+  // 첫 fetch 결과는 skip (전체가 unlock 으로 폭발하는 것 방지).
+  useEffect(() => {
+    if (prevTasksRef.current === null) {
+      prevTasksRef.current = tasks;
+      return;
+    }
+    const newly = detectUnlocks(prevTasksRef.current, tasks);
+    prevTasksRef.current = tasks;
+    if (newly.length === 0) return;
+    setUnlockingIds((prev) => {
+      const nextSet = new Set(prev);
+      for (const id of newly) nextSet.add(id);
+      return nextSet;
+    });
+    for (const id of newly) {
+      window.setTimeout(() => {
+        setUnlockingIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const nextSet = new Set(prev);
+          nextSet.delete(id);
+          return nextSet;
+        });
+      }, 900);
+    }
+  }, [tasks]);
+
   const layout = useMemo(() => {
     if (status !== 'ready') return null;
-    const { nodes, edges } = buildGraph(tasks);
+    const { nodes, edges } = buildGraph(tasks, { unlockingIds });
     return { nodes: applyLayout(nodes, edges), edges };
-  }, [status, tasks]);
+  }, [status, tasks, unlockingIds]);
 
   return (
     <main className="relative flex-1 overflow-hidden bg-slate-100">

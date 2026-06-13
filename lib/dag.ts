@@ -1,12 +1,21 @@
 import dagre from 'dagre';
 import { Position } from 'reactflow';
 import type { Task } from '@/lib/tasks';
+import { rewardText } from '@/lib/quest';
+
+export type TaskNodeData = {
+  task: Task;
+  isReady: boolean;
+  isLocked: boolean;
+  isUnlocking: boolean;
+  reward: string;
+};
 
 export type FlowNode = {
   id: string;
   type: 'task';
   position: { x: number; y: number };
-  data: { task: Task };
+  data: TaskNodeData;
   sourcePosition?: Position;
   targetPosition?: Position;
 };
@@ -19,38 +28,63 @@ export type FlowEdge = {
 };
 
 /**
- * 스파이크에서 검증된 설정 (04-quest-game-ui §8.1, §8.2).
- * 카드 크기 150×76, 컴팩트 dagre 설정.
+ * #22 퀘스트 카드 노드 — 카드 5줄 (icon · priority · title · meta · reward) 에 맞춘 크기.
+ * 기존 150×76 → 200×120 으로 늘리고 dagre 간격도 조정.
  */
-const NODE_WIDTH = 150;
-const NODE_HEIGHT = 76;
+export const NODE_WIDTH = 200;
+export const NODE_HEIGHT = 120;
 const DAGRE_CONFIG = {
   rankdir: 'TB',
-  nodesep: 12,
-  ranksep: 28,
+  nodesep: 14,
+  ranksep: 36,
   ranker: 'tight-tree',
   marginx: 16,
   marginy: 16,
 } as const;
 
-export function buildGraph(tasks: Task[]): {
+export type BuildOptions = {
+  unlockingIds?: Set<string>;
+};
+
+export function buildGraph(
+  tasks: Task[],
+  options: BuildOptions = {},
+): {
   nodes: FlowNode[];
   edges: FlowEdge[];
 } {
-  const nodes: FlowNode[] = tasks.map((task) => ({
-    id: task.id,
-    type: 'task',
-    position: { x: 0, y: 0 }, // applyLayout 이 덮어씀
-    data: { task },
-  }));
+  const unlockingIds = options.unlockingIds ?? new Set<string>();
+  const statusById = new Map(tasks.map((t) => [t.id, t.status]));
+
+  const nodes: FlowNode[] = tasks.map((task) => {
+    const isReady =
+      task.status === 'todo' &&
+      task.prerequisites.every((p) => {
+        const s = statusById.get(p);
+        return s === undefined || s === 'done'; // dangling = done
+      });
+    const isLocked = task.status === 'todo' && !isReady;
+    return {
+      id: task.id,
+      type: 'task',
+      position: { x: 0, y: 0 },
+      data: {
+        task,
+        isReady,
+        isLocked,
+        isUnlocking: unlockingIds.has(task.id),
+        reward: rewardText(task, tasks),
+      },
+    };
+  });
 
   const edges: FlowEdge[] = [];
   for (const task of tasks) {
     for (const prereqId of task.prerequisites) {
       edges.push({
         id: `${prereqId}->${task.id}`,
-        source: prereqId, // 선행 작업이 source (위)
-        target: task.id, // 의존 작업이 target (아래)
+        source: prereqId,
+        target: task.id,
         type: 'smoothstep',
       });
     }
@@ -78,11 +112,9 @@ export function applyLayout(nodes: FlowNode[], edges: FlowEdge[]): FlowNode[] {
     return {
       ...n,
       position: {
-        // dagre 의 (x, y) 는 노드 중심 → React Flow 가 기대하는 좌상단으로 변환
         x: laid.x - NODE_WIDTH / 2,
         y: laid.y - NODE_HEIGHT / 2,
       },
-      // TB 레이아웃의 핸들 위치
       targetPosition: Position.Top,
       sourcePosition: Position.Bottom,
     };
